@@ -70,10 +70,10 @@ export default function SignupScreen() {
             <Text style={styles.orText}>Or get started with</Text>
 
             <TouchableOpacity style={styles.gmailButton}>
-              {/* <Image
+              <Image
                 source={require('../../assets/images/gmail.png')}
                 style={styles.gmailIcon}
-              /> */}
+              />
               <Text style={styles.gmailButtonText}>Create account with Gmail</Text>
             </TouchableOpacity>
 
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '400',
-    color: '#6b7280',
+    color: '#212121',
     marginVertical: 10,
   },
   gmailButton: {
@@ -193,14 +193,14 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   gmailIcon: {
-    width: 14,
+    width: 20,
     height: 14,
     marginRight: 12,
   },
   gmailButtonText: {
     fontSize: 16,
     fontWeight: '400',
-    color: '#111827',
+    color: '#3B3B3B',
   },
   loginContainer: {
     flexDirection: 'row',
@@ -209,25 +209,27 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   loginText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '400',
-    color: '#111827',
+    color: '#212121',
   },
   loginLink: {
-    fontSize: 16,
-    color: '#2563eb',
+    fontSize: 14,
+    color: '#3358FF',
     fontWeight: '500',
   },
   agreementText: {
     fontSize: 14,
     fontWeight: '400',
-    color: '#6b7280',
+    color: '#212121',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 32,
   },
   linkText: {
-    color: '#2563eb',
+    color: '#3358FF',
     fontWeight: '500',
+    fontSize: 14,
+    textDecorationLine: 'underline',
   },
 });

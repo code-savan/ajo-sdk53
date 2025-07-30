@@ -33,11 +33,22 @@ export default function MainScreen() {
   const handleNotificationsPress = () => {
     navigation.navigate('Notifications');
   };
+
+  const handleGroupPress = (groupData: any) => {
+    navigation.navigate('GroupDetail', { 
+      groupName: groupData.name,
+      groupId: groupData.id,
+      amount: groupData.amount,
+      memberCount: groupData.memberCount,
+      monthlyContribution: groupData.monthlyContribution,
+      date: groupData.date
+    });
+  };
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
-          <Text style={styles.headerText}>Welcome, Alex.</Text>
+          <Text style={styles.headerText}>Welcome, Dean.</Text>
           <TouchableOpacity onPress={handleNotificationsPress}>
             <Bell color="#111827" size={24} />
             <View style={styles.notificationBadge}>
@@ -103,7 +114,17 @@ export default function MainScreen() {
           {/* Groups Section */}
           <View style={styles.groupsSection}>
             {/* Hawaii Vacation Group */}
-            <View style={styles.groupItem}>
+            <TouchableOpacity 
+              style={styles.groupItem}
+              onPress={() => handleGroupPress({
+                name: 'Hawaii Vacation',
+                id: 'hawaii-vacation',
+                amount: '$1,500.00',
+                memberCount: 15,
+                monthlyContribution: '$100 / mnth',
+                date: '1/07/2025'
+              })}
+            >
               <View style={styles.groupContent}>
                 <View style={styles.groupIcon}>
                   {/* Simple map-like background with coin icon */}
@@ -132,10 +153,20 @@ export default function MainScreen() {
                   </View>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
 
             {/* Cooking Fees Group */}
-            <View style={styles.groupItem}>
+            <TouchableOpacity 
+              style={styles.groupItem}
+              onPress={() => handleGroupPress({
+                name: 'Cooking Fees',
+                id: 'cooking-fees',
+                amount: '$1,000.00',
+                memberCount: 10,
+                monthlyContribution: '$100 / mnth',
+                date: '1/07/2025'
+              })}
+            >
               <View style={styles.groupContent}>
                 <View style={styles.groupIcon}>
                   <View style={styles.groupIconBg}>
@@ -163,10 +194,20 @@ export default function MainScreen() {
                   </View>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
 
             {/* TV Prep Group */}
-            <View style={styles.groupItem}>
+            <TouchableOpacity 
+              style={styles.groupItem}
+              onPress={() => handleGroupPress({
+                name: 'TV Prep',
+                id: 'tv-prep',
+                amount: '$1,000.00',
+                memberCount: 10,
+                monthlyContribution: '$100 / mnth',
+                date: '1/07/2025'
+              })}
+            >
               <View style={styles.groupContent}>
                 <View style={styles.groupIcon}>
                   <View style={styles.groupIconBg}>
@@ -194,7 +235,7 @@ export default function MainScreen() {
                   </View>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
 
             {/* View All Groups Button */}
             <TouchableOpacity style={styles.viewAllGroupsButton} onPress={handleViewAllGroups}>
@@ -285,7 +326,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
   },
   header: {
     flexDirection: 'row',

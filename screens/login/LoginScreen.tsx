@@ -1,69 +1,96 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
+import { ArrowLeft, Eye, EyeOff, ScanFace } from 'lucide-react-native';
 
 type LoginScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Login'>;
 
 export default function LoginScreen() {
   const navigation = useNavigation<LoginScreenNavigationProp>();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
 
-  const handleLogin = () => {
-    // Simple validation
-    if (email && password) {
+  const handleBack = () => {
+    navigation.goBack();
+  };
+
+  const handleProceed = () => {
+    if (pin.length >= 4) {
       navigation.navigate('MainTabs');
     }
   };
 
-  const handleSignUp = () => {
-    navigation.navigate('Signup');
+  const handleUseFaceID = () => {
+    // Handle Face ID authentication
+    navigation.navigate('MainTabs');
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to your Ajo account</Text>
+      <View style={styles.content}>
+        {/* Header with back button */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <ArrowLeft size={24} color="#000" />
+          </TouchableOpacity>
+        </View>
 
-          <View style={styles.form}>
-            <Input
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              style={styles.input}
-            />
-            <Input
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              style={styles.input}
-            />
+        {/* Title and subtitle */}
+        <View style={styles.titleSection}>
+          <Text style={styles.title}>Login</Text>
+          <Text style={styles.subtitle}>"Welcome back. Let's get you where you left off."</Text>
+        </View>
 
-            <Button
-              title="Sign In"
-              onPress={handleLogin}
-              style={styles.loginButton}
+        {/* PIN Input Section */}
+        <View style={styles.pinSection}>
+          <Text style={styles.pinLabel}>Input Pin</Text>
+          <View style={styles.pinInputContainer}>
+            <TextInput
+              style={styles.pinInput}
+              value={pin}
+              onChangeText={setPin}
+              secureTextEntry={!showPin}
+              placeholder="******"
+              placeholderTextColor="#999"
+              keyboardType="numeric"
+              maxLength={6}
             />
-
-            <Button
-              title="Don't have an account? Sign up"
-              onPress={handleSignUp}
-              variant="outline"
-              style={styles.signupButton}
-            />
+            <TouchableOpacity
+              onPress={() => setShowPin(!showPin)}
+              style={styles.eyeButton}
+            >
+              {showPin ? (
+                <Eye size={20} color="#999" />
+              ) : (
+                <EyeOff size={20} color="#999" />
+              )}
+            </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
+
+        {/* Proceed Button */}
+        <TouchableOpacity
+          style={styles.proceedButton}
+          onPress={handleProceed}
+        >
+          <Text style={styles.proceedButtonText}>Proceed</Text>
+        </TouchableOpacity>
+
+        {/* Face ID Button */}
+        <View style={styles.faceIdSection}>
+          <TouchableOpacity
+            style={styles.faceIdButton}
+            onPress={handleUseFaceID}
+          >
+            <Text style={styles.faceIdText}>Use face ID
+            </Text>
+            <ScanFace size={20} color="#000" />
+          </TouchableOpacity>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -73,39 +100,91 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
-  scrollView: {
-    flex: 1,
-  },
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 20,
+  },
+  header: {
+    marginBottom: 40,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
     justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  titleSection: {
+    marginBottom: 60,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 8,
+    fontWeight: 'medium',
+    color: '#1C1C1C',
+    marginBottom: 5,
   },
   subtitle: {
+    fontSize: 12,
+    color: '#303030',
+    lineHeight: 24,
+  },
+  pinSection: {
+    marginBottom: 40,
+  },
+  pinLabel: {
+    fontSize: 12,
+    color: '#929292',
+    marginBottom: 12,
+  },
+  pinInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  pinInput: {
+    flex: 1,
+    fontSize: 18,
+    color: '#000000',
+    fontWeight: '500',
+  },
+  eyeButton: {
+    padding: 4,
+  },
+  proceedButton: {
+    backgroundColor: '#0D0D0D',
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginBottom: 60,
+  },
+  proceedButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
-    color: '#6b7280',
+    fontWeight: 'regular',
     textAlign: 'center',
-    marginBottom: 48,
   },
-  form: {
-    gap: 16,
+  faceIdSection: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: 40,
   },
-  input: {
-    marginBottom: 8,
+  faceIdButton: {
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
   },
-  loginButton: {
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  signupButton: {
-    marginTop: 8,
+  faceIdText: {
+    fontSize: 14,
+    color: '#1E1E1E',
+    textAlign: 'center',
+    fontWeight: "regular"
   },
 });

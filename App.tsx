@@ -7,12 +7,17 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 // Import screens
 import SplashScreenComponent from './screens/splash/SplashScreen';
+import WelcomeScreen from './screens/welcome/WelcomeScreen';
 import SignupScreen from './screens/signup/SignupScreen';
 import LoginScreen from './screens/login/LoginScreen';
 import VerifyEmailScreen from './screens/verify-email/VerifyEmailScreen';
 import MainScreen from './screens/main/MainScreen';
 import GroupsScreen from './screens/groups/GroupsScreen';
 import AllGroupsScreen from './screens/groups/AllGroupsScreen';
+import GroupDetailScreen from './screens/groups/GroupDetailScreen';
+import AllMembersScreen from './screens/groups/AllMembersScreen';
+import MakeDepositScreen from './screens/groups/MakeDepositScreen';
+import GroupFundedScreen from './screens/groups/GroupFundedScreen';
 import RecentActivitiesScreen from './screens/activities/RecentActivitiesScreen';
 import ActivityDetailScreen from './screens/activities/ActivityDetailScreen';
 import NotificationsScreen from './screens/notifications/NotificationsScreen';
@@ -39,6 +44,7 @@ import GroupCreatedScreen from './screens/groups/GroupCreatedScreen';
 // Import navigation types
 export type RootStackParamList = {
   Splash: undefined;
+  Welcome: undefined;
   Signup: undefined;
   Login: undefined;
   VerifyEmail: undefined;
@@ -54,9 +60,13 @@ export type RootStackParamList = {
   CreateGroup: undefined;
   GroupCreated: undefined;
   AllGroups: undefined;
+  AllMembers: undefined;
   RecentActivities: undefined;
   ActivityDetail: { activity: { person: string; type: string; amount: string; } };
   Notifications: undefined;
+  GroupDetail: { groupName: string; groupId: string };
+  MakeDeposit: undefined;
+  GroupFunded: { amount?: string; groupName?: string };
   NotificationSettings: undefined;
   AccountInfo: undefined;
   Security: undefined;
@@ -142,6 +152,7 @@ export default function App() {
           }}
         >
           <Stack.Screen name="Splash" component={SplashScreenComponent} />
+          <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="Signup" component={SignupScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
@@ -156,6 +167,10 @@ export default function App() {
           <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
           <Stack.Screen name="GroupCreated" component={GroupCreatedScreen} />
           <Stack.Screen name="AllGroups" component={AllGroupsScreen} />
+          <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
+          <Stack.Screen name="AllMembers" component={AllMembersScreen} />
+          <Stack.Screen name="MakeDeposit" component={MakeDepositScreen} />
+          <Stack.Screen name="GroupFunded" component={GroupFundedScreen} />
           <Stack.Screen name="RecentActivities" component={RecentActivitiesScreen} />
           <Stack.Screen name="ActivityDetail" component={ActivityDetailScreen} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} />

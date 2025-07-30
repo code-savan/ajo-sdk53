@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  TextInput, 
-  Switch, 
-  Keyboard, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Switch,
+  Keyboard,
   TouchableWithoutFeedback,
   ScrollView,
   KeyboardAvoidingView,
@@ -44,7 +44,7 @@ export default function FundWalletScreen() {
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
   const [isModalVisible, setModalVisible] = useState(false);
   const [canSaveCard, setCanSaveCard] = useState(false);
-  
+
   const scrollViewRef = useRef<ScrollView>(null);
 
   const handleGoBack = () => {
@@ -59,7 +59,7 @@ export default function FundWalletScreen() {
         if (storedCards) {
           const parsedCards = JSON.parse(storedCards);
           setSavedCards(parsedCards);
-          
+
           // Auto-select the first card if there are saved cards
           if (parsedCards.length > 0) {
             setSelectedCardIndex(0);
@@ -69,18 +69,18 @@ export default function FundWalletScreen() {
         console.error('Error loading saved cards:', error);
       }
     };
-    
+
     loadSavedCards();
   }, []);
 
   // Validate card form fields whenever they change
   useEffect(() => {
     // Check if all fields are filled properly
-    const isValid = 
-      cardNumber.replace(/\s/g, '').length === 16 && 
-      expiry.length === 5 && 
+    const isValid =
+      cardNumber.replace(/\s/g, '').length === 16 &&
+      expiry.length === 5 &&
       cvv.length === 3;
-    
+
     setIsCardFormValid(isValid);
     setCanSaveCard(isValid);
   }, [cardNumber, expiry, cvv]);
@@ -93,7 +93,7 @@ export default function FundWalletScreen() {
       setModalVisible(true);
     }
   };
-  
+
   const handleSaveCard = async () => {
     if (isCardFormValid && !savedCards.some(card => card.cardNumber === cardNumber)) {
       try {
@@ -104,17 +104,17 @@ export default function FundWalletScreen() {
           cvv,
           lastFourDigits
         };
-        
+
         // Save to existing cards
         const updatedCards = [...savedCards, newCard];
         await AsyncStorage.setItem('savedCards', JSON.stringify(updatedCards));
         setSavedCards(updatedCards);
         setSelectedCardIndex(updatedCards.length - 1);
-        
+
         // Hide the form and show saved cards
         setShowAddCardForm(false);
         setShowSavedCards(true);
-        
+
         // Reset form fields
         setCardNumber('');
         setExpiry('');
@@ -129,12 +129,12 @@ export default function FundWalletScreen() {
   const selectPaymentMethod = (method: 'Bank Transfer' | 'Card') => {
     setPaymentMethod(method);
     setShowPaymentOptions(false);
-    
+
     if (method === 'Card') {
       if (savedCards.length > 0) {
         setShowSavedCards(true);
         setShowAddCardForm(false);
-        
+
         // Select first card by default
         selectSavedCard(savedCards[0], 0);
       } else {
@@ -148,7 +148,7 @@ export default function FundWalletScreen() {
       setShowAddCardForm(false);
     }
   };
-  
+
   const selectSavedCard = (card: SavedCard, index: number) => {
     setCardNumber(card.cardNumber);
     setExpiry(card.expiry);
@@ -156,7 +156,7 @@ export default function FundWalletScreen() {
     setSelectedCardIndex(index);
     setIsCardFormValid(true);
   };
-  
+
   const handleAddNewCard = () => {
     setShowSavedCards(false);
     setShowAddCardForm(true);
@@ -167,39 +167,39 @@ export default function FundWalletScreen() {
     setSaveCard(false);
     setSelectedCardIndex(null);
   };
-  
+
   // Format card number with spaces
   const formatCardNumber = (text: string) => {
     const cleaned = text.replace(/\D/g, '');
     let formatted = '';
-    
+
     for (let i = 0; i < cleaned.length; i++) {
       if (i > 0 && i % 4 === 0) {
         formatted += ' ';
       }
       formatted += cleaned[i];
     }
-    
+
     return formatted;
   };
-  
+
   // Format expiry date with slash
   const formatExpiry = (text: string) => {
     const cleaned = text.replace(/\D/g, '');
     let formatted = cleaned;
-    
+
     if (cleaned.length > 2) {
       formatted = cleaned.substring(0, 2) + ' / ' + cleaned.substring(2);
     }
-    
+
     return formatted;
   };
-  
+
   const handleCardNumberChange = (text: string) => {
     const formatted = formatCardNumber(text);
     setCardNumber(formatted.slice(0, 19)); // Limit to 16 digits + 3 spaces
   };
-  
+
   const handleExpiryChange = (text: string) => {
     const formatted = formatExpiry(text);
     setExpiry(formatted.slice(0, 5)); // Format: MM/YY
@@ -228,10 +228,10 @@ export default function FundWalletScreen() {
           <ArrowLeft width={24} height={24} color="#000000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Fund wallet</Text>
-        <View style={styles.headerSpacer} />
+        {/* <View style={styles.headerSpacer} /> */}
       </View>
 
-      <ScrollView 
+      <ScrollView
         ref={scrollViewRef}
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
@@ -260,8 +260,8 @@ export default function FundWalletScreen() {
 
         <View style={styles.inputSection}>
           <Text style={styles.inputLabel}>Payment method</Text>
-          <TouchableOpacity 
-            style={styles.inputContainer} 
+          <TouchableOpacity
+            style={styles.inputContainer}
             onPress={() => {
               setShowPaymentOptions(!showPaymentOptions);
               Keyboard.dismiss();
@@ -272,18 +272,18 @@ export default function FundWalletScreen() {
             </Text>
             <ChevronDown width={16} height={16} color="#000000" />
           </TouchableOpacity>
-          
+
           {showPaymentOptions && (
             <View style={styles.paymentOptions}>
-              <TouchableOpacity 
-                style={styles.paymentOption} 
+              <TouchableOpacity
+                style={styles.paymentOption}
                 onPress={() => selectPaymentMethod('Bank Transfer')}
               >
                 <Text style={styles.paymentOptionText}>Bank Transfer</Text>
               </TouchableOpacity>
               <View style={styles.optionDivider} />
-              <TouchableOpacity 
-                style={styles.paymentOption} 
+              <TouchableOpacity
+                style={styles.paymentOption}
                 onPress={() => selectPaymentMethod('Card')}
               >
                 <Text style={styles.paymentOptionText}>Debit card</Text>
@@ -297,11 +297,11 @@ export default function FundWalletScreen() {
             {showSavedCards && savedCards.length > 0 && (
               <View style={styles.savedCardsContainer}>
                 <Text style={styles.savedCardsTitle}>Saved Cards</Text>
-                
+
                 {savedCards.map((card, index) => (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     key={index}
-                    style={[styles.savedCardItem, selectedCardIndex === index && styles.selectedCardItem]} 
+                    style={[styles.savedCardItem, selectedCardIndex === index && styles.selectedCardItem]}
                     onPress={() => selectSavedCard(card, index)}
                   >
                     <View style={styles.savedCardInfo}>
@@ -309,22 +309,22 @@ export default function FundWalletScreen() {
                       <Text style={styles.savedCardExpiry}>{card.expiry}</Text>
                     </View>
                     <View style={styles.cardActions}>
-                      <View style={styles.cardTypeIcon}>  
+                      <View style={styles.cardTypeIcon}>
                         <Text style={styles.cardTypeText}>VISA</Text>
                       </View>
                       {selectedCardIndex === index && (
-                        <CheckCircle2 
-                          width={20} 
-                          height={20} 
-                          color="#04A73E" 
-                          style={styles.selectedCardIcon} 
+                        <CheckCircle2
+                          width={20}
+                          height={20}
+                          color="#04A73E"
+                          style={styles.selectedCardIcon}
                         />
                       )}
                     </View>
                   </TouchableOpacity>
                 ))}
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={styles.addNewCardButton}
                   onPress={handleAddNewCard}
                 >
@@ -335,7 +335,7 @@ export default function FundWalletScreen() {
                 </TouchableOpacity>
               </View>
             )}
-            
+
             {showAddCardForm && (
               <View style={styles.cardFormContainer}>
                 <View style={styles.cardFormHeader}>
@@ -380,7 +380,7 @@ export default function FundWalletScreen() {
                     />
                   </View>
                 </View>
-                
+
                 <View style={styles.saveCardContainer}>
                   <View style={styles.saveCardRow}>
                     <Text style={styles.saveCardText}>Save card for future use</Text>
@@ -392,9 +392,9 @@ export default function FundWalletScreen() {
                       disabled={!isCardFormValid}
                     />
                   </View>
-                  
+
                   {saveCard && (
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.saveCardButton, !canSaveCard && styles.disabledButton]}
                       onPress={handleSaveCard}
                       disabled={!canSaveCard}
@@ -405,11 +405,11 @@ export default function FundWalletScreen() {
                 </View>
               </View>
             )}
-            
+
             {!showAddCardForm && savedCards.length === 0 && (
               <View style={styles.noCardsContainer}>
                 <Text style={styles.noCardsText}>No saved cards yet.</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.addFirstCardButton}
                   onPress={handleAddNewCard}
                 >
@@ -424,12 +424,12 @@ export default function FundWalletScreen() {
         )}
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={[styles.proceedButton, 
-              (!paymentMethod || 
-              (paymentMethod === 'Card' && showAddCardForm && !isCardFormValid)) 
+          <TouchableOpacity
+            style={[styles.proceedButton,
+              (!paymentMethod ||
+              (paymentMethod === 'Card' && showAddCardForm && !isCardFormValid))
               && styles.disabledButton
-            ]} 
+            ]}
             onPress={handleProceed}
             disabled={!paymentMethod || (paymentMethod === 'Card' && showAddCardForm && !isCardFormValid)}
           >

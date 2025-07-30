@@ -22,9 +22,19 @@ export default function GroupsScreen() {
     navigation.navigate('Notifications');
   };
 
+  const handleGroupPress = (groupName: string, groupId: string) => {
+    navigation.navigate('GroupDetail', { groupName, groupId });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>My Groups</Text>
@@ -72,7 +82,10 @@ export default function GroupsScreen() {
             <Text style={styles.groupsDescription}>Take a look at your current groups.</Text>
 
             {/* Hawaii Vacation Group */}
-            <View style={styles.groupItem}>
+            <TouchableOpacity 
+              style={styles.groupItem}
+              onPress={() => handleGroupPress('Hawaii Vacation', 'hawaii-vacation')}
+            >
               <View style={styles.groupContent}>
                 <View style={styles.groupIcon}>
                   {/* Simple map-like background with coin icon */}
@@ -101,10 +114,13 @@ export default function GroupsScreen() {
                   </View>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
 
             {/* Cooking Fees Group */}
-            <View style={styles.groupItem}>
+            <TouchableOpacity 
+              style={styles.groupItem}
+              onPress={() => handleGroupPress('Cooking Fees', 'cooking-fees')}
+            >
               <View style={styles.groupContent}>
                 <View style={styles.groupIcon}>
                   <View style={styles.groupIconBg}>
@@ -132,10 +148,13 @@ export default function GroupsScreen() {
                   </View>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
 
             {/* TV Prep Group */}
-            <View style={styles.groupItem}>
+            <TouchableOpacity 
+              style={styles.groupItem}
+              onPress={() => handleGroupPress('TV Prep', 'tv-prep')}
+            >
               <View style={styles.groupContent}>
                 <View style={styles.groupIcon}>
                   <View style={styles.groupIconBg}>
@@ -163,7 +182,7 @@ export default function GroupsScreen() {
                   </View>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
 
             {/* View All Groups Button */}
             <TouchableOpacity style={styles.viewAllButton} onPress={handleViewAllGroups}>
@@ -184,6 +203,10 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 120, // Extra space for bottom navigation
   },
   header: {
     flexDirection: 'row',
@@ -222,7 +245,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingBottom: 80,
   },
   statsContainer: {
     flexDirection: 'row',

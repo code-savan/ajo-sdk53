@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, Image } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, StyleSheet, Image, ImageBackground } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
@@ -9,138 +8,76 @@ type SplashScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Splas
 
 export default function SplashScreen() {
   const navigation = useNavigation<SplashScreenNavigationProp>();
-  const bounce1 = new Animated.Value(0);
-  const bounce2 = new Animated.Value(0);
-  const bounce3 = new Animated.Value(0);
 
   useEffect(() => {
-    // Auto-navigate to sign up after 2 seconds
+    // Auto-navigate to welcome screen after 3 seconds
     const timer = setTimeout(() => {
-      navigation.navigate('Signup');
-    }, 2000);
-
-    // Animate the dots
-    const animateDot = (animValue: Animated.Value, delay: number) => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(animValue, {
-            toValue: -10,
-            duration: 300,
-            delay,
-            useNativeDriver: true,
-          }),
-          Animated.timing(animValue, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    };
-
-    animateDot(bounce1, 0);
-    animateDot(bounce2, 100);
-    animateDot(bounce3, 200);
+      navigation.navigate('Welcome');
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [navigation]);
 
   return (
-    <LinearGradient
-      colors={['#16a34a', '#15803d']}
-      style={styles.container}
-    >
-      <View style={styles.content}>
-        {/* App Logo */}
-        <Image 
-          source={require('../../assets/images/Ajo.png')} 
-          style={styles.logoImage} 
-          resizeMode="contain"
-        />
-
-        {/* Splash Image */}
-        <Image 
-          source={require('../../assets/images/splash.png')} 
-          style={styles.splashImage} 
-          resizeMode="contain"
-        />
-        
-        {/* App Name */}
-        <Text style={styles.appName}>Ajo</Text>
-        <Text style={styles.tagline}>Grow your savings together</Text>
-
-        {/* Loading indicator */}
-        <View style={styles.loadingContainer}>
-          <View style={styles.dotsContainer}>
-            <Animated.View
-              style={[
-                styles.dot,
-                { transform: [{ translateY: bounce1 }] },
-              ]}
-            />
-            <Animated.View
-              style={[
-                styles.dot,
-                { transform: [{ translateY: bounce2 }] },
-              ]}
-            />
-            <Animated.View
-              style={[
-                styles.dot,
-                { transform: [{ translateY: bounce3 }] },
-              ]}
+    <View style={styles.container}>
+      <ImageBackground
+        source={require('../../assets/images/bg.png')}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      >
+        <View style={styles.content}>
+          {/* Ajo Logo */}
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('../../assets/images/ajowhite.png')}
+              style={styles.logo}
+              resizeMode="contain"
             />
           </View>
+          
+          {/* Tagline */}
+          <View style={styles.taglineContainer}>
+            <Text style={styles.tagline}>
+              A smarter way to{"\n"}save together.
+            </Text>
+          </View>
         </View>
-      </View>
-    </LinearGradient>
+      </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#3358FF', // Blue background color
+  },
+  backgroundImage: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  logoContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  content: {
-    alignItems: 'center',
-    width: '100%',
+  logo: {
+    height: 116,
+    // No width specified - let it maintain aspect ratio
   },
-  logoImage: {
-    width: 150,
-    height: 60,
-    marginBottom: 32,
-  },
-  splashImage: {
-    width: '100%',
-    height: 300,
-    marginBottom: 32,
-  },
-  appName: {
-    fontSize: 36,
-    fontFamily: 'Roboto-Bold',
-    color: '#ffffff',
-    marginBottom: 8,
+  taglineContainer: {
+    paddingBottom: 40,
   },
   tagline: {
     fontSize: 18,
-    fontFamily: 'Inter',
-    color: '#dcfce7',
-  },
-  loadingContainer: {
-    marginTop: 48,
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    backgroundColor: '#ffffff',
-    borderRadius: 4,
-    marginHorizontal: 2,
+    fontWeight: '400', // Regular weight
+    color: '#FFFFFF',
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });
