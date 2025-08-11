@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* Design tokens based on screenshot + changelog */
+:root {
+  --bg-content: #F8F8F8; /* admin body content area */
+  --text-primary: #1E1E1E; /* link text and icon color */
+  --text-section: #7E7E7E; /* sidebar section title */
+  --border: #D9D9D9; /* borders */
+  --sidebar-active: #DDE8FF; /* active link background */
+}
+
+@theme inline {
+  --color-brand-content: var(--bg-content);
+  --color-brand-text: var(--text-primary);
+  --color-brand-section: var(--text-section);
+  --color-brand-border: var(--border);
+  --color-brand-active: var(--sidebar-active);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+body {
+  background: var(--bg-content);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+}
+
+/* Utility classes that align with the spec */
+.heading-20 {
+  font-size: 20px;
+  font-weight: 500; /* medium */
+  color: #000000;
+}
+.sidebar-section {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-section);
+}
+.sidebar-link {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+.sidebar-link-active {
+  background-color: var(--sidebar-active);
+}
+.border-base {
+  border-color: var(--border);
+}

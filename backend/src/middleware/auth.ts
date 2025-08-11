@@ -1,70 +1,40 @@
-import { Request, Response, NextFunction } from 'express';
+import { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
-import User, { IUser } from '../models/User';
+import { AuthResponse } from '@/types/database';
 
-interface AuthRequest extends Request {
-  user?: IUser;
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is not defined. Please check your environment variables.');
 }
 
-// Protect routes
-export const protect = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  let token: string | undefined;
-
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    // Set token from Bearer token in header
-    token = req.headers.authorization.split(' ')[1];
+// Verify JWT
+export async function verifyToken(req: NextApiRequest): Promise<string | object> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new Error('No token provided');
   }
 
-  // Make sure token exists
-  if (!token) {
-    res.status(401).json({
-      success: false,
-      error: 'Not authorized to access this route'
+  const token = authHeader.split(' ')[1];
+  return new Promise((resolve, reject) => {
+    jwt.verify(token, process.env.JWT_SECRET as string, (err, decoded) => {
+      if (err) {
+        return reject(err);
+      }
+      resolve(decoded);
     });
-    return;
-  }
+  });
+}
 
+// Authenticate request middleware
+export const authenticate = async (
+  req: NextApiRequest,
+  res: NextApiResponse<AuthResponse>,
+  next: () => void
+) => {
   try {
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
-
-    const user = await User.findById(decoded.id);
-    
-    if (!user) {
-      res.status(401).json({
-        success: false,
-        error: 'Not authorized to access this route'
-      });
-      return;
-    }
-
-    req.user = user;
+    const decoded = await verifyToken(req);
+    req.user = decoded as any;
     next();
   } catch (err) {
-    res.status(401).json({
-      success: false,
-      error: 'Not authorized to access this route'
-    });
+    res.status(401).json({ success: false, message: 'Unauthorized', error: err.message });
   }
-};
-
-// Grant access to specific roles
-export const authorize = (...roles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      res.status(403).json({
-        success: false,
-        error: `User role ${req.user?.role} is not authorized to access this route`
-      });
-      return;
-    }
-    next();
-  };
 };
