@@ -45,7 +45,7 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex md:flex-col justify-between w-[306px] bg-white border-r border-[#D9D9D9]">
+      <aside className="hidden md:flex md:flex-col justify-between w-[306px] h-screen fixed top-0 left-0 bg-white border-r border-[#D9D9D9]">
       <div className="h-16 flex items-center px-6 border-b border-[#D9D9D9]">
         <div className="text-[20px] font-medium text-black">Ajo
         </div>
