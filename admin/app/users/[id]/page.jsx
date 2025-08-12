@@ -1,5 +1,5 @@
-import { PageHeader, Card, Table } from "../../../../components/ui";
-import { users } from "../../../../data/adminContent";
+import { PageHeader, Card, Table } from "../../../components/ui";
+import { users } from "../../../data/adminContent";
 
 export default function UserDetail({ params }) {
   const user = users.find((u) => u.id === params.id) || users[0];
@@ -28,4 +28,3 @@ export default function UserDetail({ params }) {
     </div>
   );
 }
-
