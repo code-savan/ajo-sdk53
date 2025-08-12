@@ -1,5 +1,5 @@
-import { PageHeader, Card, Table } from "../../../../components/ui";
-import { payouts } from "../../../../data/adminContent";
+import { PageHeader, Card, Table } from "../../../components/ui";
+import { payouts } from "../../../data/adminContent";
 
 export default function PayoutsPage() {
   const columns = [
@@ -20,4 +20,3 @@ export default function PayoutsPage() {
     </div>
   );
 }
-

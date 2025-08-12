@@ -1,5 +1,5 @@
-import { PageHeader, Card, Table } from "../../../../components/ui";
-import { groups } from "../../../../data/adminContent";
+import { PageHeader, Card, Table } from "../../../components/ui";
+import { groups } from "../../../data/adminContent";
 
 export default function GroupDetail({ params }) {
   const group = groups.find((g) => g.id === params.id) || groups[0];
@@ -28,4 +28,3 @@ export default function GroupDetail({ params }) {
     </div>
   );
 }
-

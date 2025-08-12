@@ -1,5 +1,5 @@
-import { PageHeader, Card, Table } from "../../../../components/ui";
-import { transactions } from "../../../../data/adminContent";
+import { PageHeader, Card, Table } from "../../../components/ui";
+import { transactions } from "../../../data/adminContent";
 
 export default function TransactionsPage() {
   const columns = [
@@ -21,4 +21,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
