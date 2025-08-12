@@ -1,5 +1,5 @@
-import { PageHeader, Card } from "../../../../components/ui";
-import { settingsDemo } from "../../../../data/adminContent";
+import { PageHeader, Card } from "../../../components/ui";
+import { settingsDemo } from "../../../data/adminContent";
 
 export default function SecuritySettings() {
   const { twoFactorRequired, passwordPolicy } = settingsDemo.security;
@@ -17,4 +17,3 @@ export default function SecuritySettings() {
     </div>
   );
 }
-

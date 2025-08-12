@@ -1,5 +1,5 @@
-import { PageHeader, Card } from "../../../../components/ui";
-import { settingsDemo } from "../../../../data/adminContent";
+import { PageHeader, Card } from "../../../components/ui";
+import { settingsDemo } from "../../../data/adminContent";
 
 export default function GeneralSettings() {
   const { appName, timezone } = settingsDemo.general;
@@ -17,4 +17,3 @@ export default function GeneralSettings() {
     </div>
   );
 }
-
