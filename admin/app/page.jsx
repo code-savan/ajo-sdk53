@@ -3,6 +3,20 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "../components/ui";
 import { demoStats, users, groups, transactions } from "../data/adminContent";
 import Link from "next/link";
+import { 
+  Users, 
+  Building2, 
+  DollarSign, 
+  TrendingUp,
+  UserPlus,
+  UsersRound,
+  Receipt,
+  BarChart3,
+  ArrowUpRight,
+  ArrowDownRight,
+  Activity,
+  Eye
+} from "lucide-react";
 
 export default function Home() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -12,13 +26,32 @@ export default function Home() {
     return () => clearInterval(timer);
   }, []);
 
+  const formatTime = (date) => {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    const formattedHours = hours % 12 || 12;
+    const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+    return `${formattedHours}:${formattedMinutes}${ampm}`;
+  };
+
+  const getIcon = (index) => {
+    const icons = [
+      <Users className="w-6 h-6" />,
+      <Building2 className="w-6 h-6" />,
+      <DollarSign className="w-6 h-6" />,
+      <TrendingUp className="w-6 h-6" />
+    ];
+    return icons[index];
+  };
+
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col h-screen">
       <PageHeader title="Admin Dashboard" />
       <main className="flex-1 bg-gradient-to-br from-[#F8F8F8] to-[#F0F0F0] p-4 sm:p-6 overflow-y-auto">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-[#1E1E1E] mb-2">
+        <div className="mb-8 flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-[#1E1E1E]">
             Welcome back, Administrator
           </h2>
           <p className="text-[#7E7E7E]">
@@ -27,7 +60,7 @@ export default function Home() {
               year: 'numeric', 
               month: 'long', 
               day: 'numeric' 
-            })} • {currentTime.toLocaleTimeString()}
+            })} • {formatTime(currentTime)} EST
           </p>
         </div>
 
@@ -36,20 +69,18 @@ export default function Home() {
           {demoStats.overview.map((stat, index) => (
             <div
               key={stat.title}
-              className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-[#E5E5E5] relative overflow-hidden group"
+              className="bg-white rounded-2xl p-6 border border-[#E5E5E5] relative overflow-hidden group"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-4">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    index === 0 ? 'bg-blue-100' : 
-                    index === 1 ? 'bg-green-100' : 
-                    index === 2 ? 'bg-purple-100' : 
-                    'bg-orange-100'
+                    index === 0 ? 'bg-blue-100 text-blue-600' : 
+                    index === 1 ? 'bg-green-100 text-green-600' : 
+                    index === 2 ? 'bg-purple-100 text-purple-600' : 
+                    'bg-orange-100 text-orange-600'
                   }`}>
-                    <span className="text-2xl">
-                      {index === 0 ? '👥' : index === 1 ? '🏢' : index === 2 ? '💰' : '📈'}
-                    </span>
+                    {getIcon(index)}
                   </div>
                   <span className={`text-sm font-medium ${
                     stat.change.startsWith('+') ? 'text-green-500' : 'text-red-500'
