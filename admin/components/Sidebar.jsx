@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, UserSquare2, CircleDollarSign, PieChart, Bell, Settings, Headphones } from "lucide-react";
+import { Home, Users, UserSquare2, CircleDollarSign, PieChart, Bell, Settings, Headphones, Lock } from "lucide-react";
 
 const mainMenu = [
   { name: "Overview", href: "/", icon: Home },
@@ -11,6 +11,7 @@ const mainMenu = [
   { name: "Financial  Management", href: "/financial", icon: CircleDollarSign },
   { name: "Analytics", href: "/analytics", icon: PieChart },
   { name: "Notifications", href: "/notifications", icon: Bell },
+  { name: "Security", href: "/security", icon: Lock },
 ];
 
 const supportMenu = [

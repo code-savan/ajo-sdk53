@@ -75,7 +75,10 @@ export function PageHeader({ title, actions }) {
           <Bell className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-[#E5E5E5] overflow-hidden" />
+          {/* <div className="h-8 w-8 rounded-full bg-[#E5E5E5] overflow-hidden" /> */}
+          <img
+  src="https://api.dicebear.com/9.x/adventurer/svg?seed=Destiny"
+  alt="avatar" className="w-10 h-10" />
           <ChevronDown className="w-4 h-4 text-[#1E1E1E]" />
         </div>
       </div>
