@@ -19,7 +19,18 @@ import {
   Activity,
   Eye,
   Sparkles,
-  CircleDot
+  CircleDot,
+  Bell,
+  Shield,
+  Lock,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  CreditCard,
+  PieChart,
+  TrendingDown,
+  UserCheck,
+  Settings
 } from "lucide-react";
 
 export default function Home() {
@@ -39,24 +50,62 @@ export default function Home() {
     return `${formattedHours}:${formattedMinutes}${ampm}`;
   };
 
-  const getIcon = (index) => {
-    const icons = [
-      <Users className="w-5 h-5" strokeWidth={1.5} />,
-      <Building2 className="w-5 h-5" strokeWidth={1.5} />,
-      <DollarSign className="w-5 h-5" strokeWidth={1.5} />,
-      <TrendingUp className="w-5 h-5" strokeWidth={1.5} />
-    ];
-    return icons[index];
-  };
+  // Comprehensive stats from all main menu sections
+  const comprehensiveStats = [
+    // Users section
+    { title: 'Total Users', value: '2,845', change: '+12%', icon: Users, color: 'blue' },
+    { title: 'Verified Users', value: '2,634', change: '+8%', icon: UserCheck, color: 'emerald' },
+    { title: 'New This Month', value: '156', change: '+23%', icon: UserPlus, color: 'violet' },
+    { title: 'User Retention', value: '94.2%', change: '+2%', icon: TrendingUp, color: 'indigo' },
+    
+    // Groups section
+    { title: 'Active Groups', value: '142', change: '+8%', icon: UsersRound, color: 'teal' },
+    { title: 'Total Members', value: '1,268', change: '+15%', icon: Users, color: 'cyan' },
+    { title: 'Groups Created', value: '18', change: '+6%', icon: Building2, color: 'green' },
+    { title: 'Completion Rate', value: '87.5%', change: '+4%', icon: CheckCircle, color: 'emerald' },
+    
+    // Financial section
+    { title: 'Total Volume', value: '$12.8M', change: '+23%', icon: DollarSign, color: 'yellow' },
+    { title: 'Monthly Revenue', value: '$485K', change: '+18%', icon: TrendingUp, color: 'orange' },
+    { title: 'Total Transactions', value: '8,429', change: '+31%', icon: Receipt, color: 'red' },
+    { title: 'Pending Payouts', value: '$127K', change: '-5%', icon: Clock, color: 'amber' },
+    
+    // Analytics section
+    { title: 'Growth Rate', value: '+23.5%', change: '+5%', icon: BarChart3, color: 'purple' },
+    { title: 'Avg. Savings', value: '$4,250', change: '+12%', icon: PieChart, color: 'pink' },
+    { title: 'Success Rate', value: '96.8%', change: '+1%', icon: Activity, color: 'blue' },
+    { title: 'User Engagement', value: '78.9%', change: '+7%', icon: TrendingUp, color: 'indigo' },
+    
+    // Notifications section
+    { title: 'Active Campaigns', value: '24', change: '+3%', icon: Bell, color: 'violet' },
+    { title: 'Delivery Rate', value: '98.2%', change: '+0.5%', icon: CheckCircle, color: 'emerald' },
+    { title: 'Open Rate', value: '67.4%', change: '+8%', icon: Eye, color: 'blue' },
+    { title: 'Click Rate', value: '12.8%', change: '+15%', icon: ArrowUp, color: 'green' },
+    
+    // Security section
+    { title: 'Security Score', value: '98.5%', change: '+1%', icon: Shield, color: 'green' },
+    { title: 'Failed Logins', value: '23', change: '-12%', icon: Lock, color: 'red' },
+    { title: '2FA Enabled', value: '89.4%', change: '+6%', icon: UserCheck, color: 'emerald' },
+    { title: 'Risk Alerts', value: '7', change: '-18%', icon: AlertTriangle, color: 'amber' }
+  ];
 
-  const getStatColor = (index) => {
-    const colors = [
-      { bg: 'bg-blue-50/50', icon: 'text-blue-600', border: 'border-blue-100' },
-      { bg: 'bg-emerald-50/50', icon: 'text-emerald-600', border: 'border-emerald-100' },
-      { bg: 'bg-violet-50/50', icon: 'text-violet-600', border: 'border-violet-100' },
-      { bg: 'bg-amber-50/50', icon: 'text-amber-600', border: 'border-amber-100' }
-    ];
-    return colors[index] || colors[0];
+  const getStatColor = (colorName) => {
+    const colors = {
+      blue: { bg: 'bg-blue-50/50', icon: 'text-blue-600', border: 'border-blue-100' },
+      emerald: { bg: 'bg-emerald-50/50', icon: 'text-emerald-600', border: 'border-emerald-100' },
+      violet: { bg: 'bg-violet-50/50', icon: 'text-violet-600', border: 'border-violet-100' },
+      amber: { bg: 'bg-amber-50/50', icon: 'text-amber-600', border: 'border-amber-100' },
+      indigo: { bg: 'bg-indigo-50/50', icon: 'text-indigo-600', border: 'border-indigo-100' },
+      teal: { bg: 'bg-teal-50/50', icon: 'text-teal-600', border: 'border-teal-100' },
+      cyan: { bg: 'bg-cyan-50/50', icon: 'text-cyan-600', border: 'border-cyan-100' },
+      green: { bg: 'bg-green-50/50', icon: 'text-green-600', border: 'border-green-100' },
+      yellow: { bg: 'bg-yellow-50/50', icon: 'text-yellow-600', border: 'border-yellow-100' },
+      orange: { bg: 'bg-orange-50/50', icon: 'text-orange-600', border: 'border-orange-100' },
+      red: { bg: 'bg-red-50/50', icon: 'text-red-600', border: 'border-red-100' },
+      purple: { bg: 'bg-purple-50/50', icon: 'text-purple-600', border: 'border-purple-100' },
+      pink: { bg: 'bg-pink-50/50', icon: 'text-pink-600', border: 'border-pink-100' }
+    };
+    return colors[colorName] || colors.blue;
   };
 
   return (
@@ -87,85 +136,259 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Stats Grid - Redesigned */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {demoStats.overview.map((stat, index) => {
-            const color = getStatColor(index);
-            const isPositive = stat.change.startsWith('+');
-            return (
-              <div
-                key={stat.title}
-                className="bg-white/80 backdrop-blur-sm p-6 border border-[#00000008] hover:border-[#00000020] transition-all duration-300 cursor-pointer group"
-              >
-                {/* Top Section */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`w-10 h-10 ${color.bg} ${color.border} border flex items-center justify-center ${color.icon}`}>
-                    {getIcon(index)}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {isPositive ? (
-                      <ArrowUp className="w-3 h-3 text-emerald-500" strokeWidth={2} />
-                    ) : (
-                      <ArrowDown className="w-3 h-3 text-red-500" strokeWidth={2} />
-                    )}
-                    <span className={`text-xs font-medium ${
-                      isPositive ? 'text-emerald-500' : 'text-red-500'
-                    }`}>
-                      {stat.change}
-                    </span>
-                  </div>
+        {/* Platform Overview - Tabular Layout */}
+        <div className="bg-white/80 backdrop-blur-sm border border-[#00000008] mb-8">
+          <div className="p-6 border-b border-[#00000008]">
+            <h3 className="text-lg font-light text-[#1E1E1E]">Platform Overview</h3>
+            <p className="text-xs text-[#999999] mt-1">Key metrics across all platform sections</p>
+          </div>
+          
+          <div className="divide-y divide-[#00000008]">
+            {/* User Management Row */}
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-blue-50/50 border border-blue-100 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-blue-600" strokeWidth={1.5} />
                 </div>
-
-                {/* Value Section */}
-                <div className="space-y-1">
-                  <p className="text-3xl font-light text-[#1E1E1E] tracking-tight">
-                    {stat.value}
-                  </p>
-                  <h3 className="text-[#999999] text-xs font-normal uppercase tracking-wider">
-                    {stat.title}
-                  </h3>
+                <div>
+                  <h4 className="text-sm font-medium text-[#1E1E1E]">User Management</h4>
+                  <p className="text-xs text-[#999999]">User registrations, verifications, and activity</p>
                 </div>
-
-                {/* Bottom accent line */}
-                <div className={`h-0.5 ${color.bg} mt-4 w-0 group-hover:w-full transition-all duration-500`} />
               </div>
-            );
-          })}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">2,845</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Total Users</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+12%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">2,634</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Verified</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+8%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">156</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">New This Month</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+23%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">94.2%</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Retention Rate</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+2%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Group Management Row */}
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-emerald-50/50 border border-emerald-100 flex items-center justify-center">
+                  <UsersRound className="w-4 h-4 text-emerald-600" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-[#1E1E1E]">Group Management</h4>
+                  <p className="text-xs text-[#999999]">Group creation, membership, and completion rates</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">142</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Active Groups</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+8%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">1,268</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Total Members</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+15%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">18</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Created This Month</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+6%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">87.5%</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Completion Rate</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+4%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Financial Management Row */}
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-amber-50/50 border border-amber-100 flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-amber-600" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-[#1E1E1E]">Financial Management</h4>
+                  <p className="text-xs text-[#999999]">Transaction volume, revenue, and payouts</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">$12.8M</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Total Volume</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+23%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">$485K</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Monthly Revenue</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+18%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">8,429</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Transactions</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+31%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">$127K</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Pending Payouts</p>
+                  <span className="text-[10px] text-red-600 font-medium">-5%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Analytics Row */}
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-purple-50/50 border border-purple-100 flex items-center justify-center">
+                  <BarChart3 className="w-4 h-4 text-purple-600" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-[#1E1E1E]">Analytics & Insights</h4>
+                  <p className="text-xs text-[#999999]">Growth metrics, engagement, and performance</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">+23.5%</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Growth Rate</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+5%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">$4,250</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Avg. Savings</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+12%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">96.8%</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Success Rate</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+1%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">78.9%</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">User Engagement</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+7%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Notifications Row */}
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-violet-50/50 border border-violet-100 flex items-center justify-center">
+                  <Bell className="w-4 h-4 text-violet-600" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-[#1E1E1E]">Notifications & Campaigns</h4>
+                  <p className="text-xs text-[#999999]">Email campaigns, delivery rates, and engagement</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">24</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Active Campaigns</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+3%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">98.2%</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Delivery Rate</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+0.5%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">67.4%</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Open Rate</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+8%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">12.8%</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Click Rate</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+15%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Security Row */}
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-green-50/50 border border-green-100 flex items-center justify-center">
+                  <Shield className="w-4 h-4 text-green-600" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-[#1E1E1E]">Security & Compliance</h4>
+                  <p className="text-xs text-[#999999]">Security metrics, authentication, and risk management</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">98.5%</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Security Score</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+1%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">23</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Failed Logins</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">-12%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">89.4%</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">2FA Enabled</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">+6%</span>
+                </div>
+                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
+                  <p className="text-lg font-light text-[#1E1E1E]">7</p>
+                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Risk Alerts</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">-18%</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - Simplified */}
         <div className="bg-white/80 backdrop-blur-sm p-6 mb-8 border border-[#00000008]">
           <h3 className="text-sm font-light uppercase tracking-wider text-[#999999] mb-6">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link href="/users" className="group relative p-6 bg-[#FAFAFA] border border-[#00000008] hover:border-[#00000020] transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Eye className="w-6 h-6 mb-3 text-blue-500" strokeWidth={1.5} />
-                  <span className="text-sm font-light text-[#1E1E1E]">View Users</span>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-[#999999] group-hover:text-blue-500 transition-colors" strokeWidth={1.5} />
-              </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <Link href="/users" className="group relative p-4 bg-[#FAFAFA] border border-[#00000008] hover:border-[#00000020] transition-all duration-300 text-center">
+              <Users className="w-5 h-5 mb-2 text-blue-500 mx-auto" strokeWidth={1.5} />
+              <span className="text-sm font-light text-[#1E1E1E] block">Users</span>
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
             </Link>
-            <Link href="/groups" className="group relative p-6 bg-[#FAFAFA] border border-[#00000008] hover:border-[#00000020] transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <UsersRound className="w-6 h-6 mb-3 text-emerald-500" strokeWidth={1.5} />
-                  <span className="text-sm font-light text-[#1E1E1E]">View Groups</span>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-[#999999] group-hover:text-emerald-500 transition-colors" strokeWidth={1.5} />
-              </div>
+            <Link href="/groups" className="group relative p-4 bg-[#FAFAFA] border border-[#00000008] hover:border-[#00000020] transition-all duration-300 text-center">
+              <UsersRound className="w-5 h-5 mb-2 text-emerald-500 mx-auto" strokeWidth={1.5} />
+              <span className="text-sm font-light text-[#1E1E1E] block">Groups</span>
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
             </Link>
-            <Link href="/financial/transactions" className="group relative p-6 bg-[#FAFAFA] border border-[#00000008] hover:border-[#00000020] transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Receipt className="w-6 h-6 mb-3 text-violet-500" strokeWidth={1.5} />
-                  <span className="text-sm font-light text-[#1E1E1E]">View Transactions</span>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-[#999999] group-hover:text-violet-500 transition-colors" strokeWidth={1.5} />
-              </div>
+            <Link href="/financial" className="group relative p-4 bg-[#FAFAFA] border border-[#00000008] hover:border-[#00000020] transition-all duration-300 text-center">
+              <DollarSign className="w-5 h-5 mb-2 text-amber-500 mx-auto" strokeWidth={1.5} />
+              <span className="text-sm font-light text-[#1E1E1E] block">Financial</span>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
+            </Link>
+            <Link href="/analytics" className="group relative p-4 bg-[#FAFAFA] border border-[#00000008] hover:border-[#00000020] transition-all duration-300 text-center">
+              <BarChart3 className="w-5 h-5 mb-2 text-purple-500 mx-auto" strokeWidth={1.5} />
+              <span className="text-sm font-light text-[#1E1E1E] block">Analytics</span>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
+            </Link>
+            <Link href="/notifications" className="group relative p-4 bg-[#FAFAFA] border border-[#00000008] hover:border-[#00000020] transition-all duration-300 text-center">
+              <Bell className="w-5 h-5 mb-2 text-violet-500 mx-auto" strokeWidth={1.5} />
+              <span className="text-sm font-light text-[#1E1E1E] block">Notifications</span>
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
+            </Link>
+            <Link href="/security" className="group relative p-4 bg-[#FAFAFA] border border-[#00000008] hover:border-[#00000020] transition-all duration-300 text-center">
+              <Shield className="w-5 h-5 mb-2 text-green-500 mx-auto" strokeWidth={1.5} />
+              <span className="text-sm font-light text-[#1E1E1E] block">Security</span>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
             </Link>
           </div>
         </div>
