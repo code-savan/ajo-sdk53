@@ -25,6 +25,7 @@ export function PageHeader({ title, actions }) {
       "/financial": "Financial Management",
       "/analytics": "Analytics",
       "/notifications": "Notifications",
+      "/admin": "Admin Management",
       "/settings": "Settings",
       "/help": "Help & Support",
     };
@@ -55,31 +56,49 @@ export function PageHeader({ title, actions }) {
   const displayTitle = derivedTitle || title || "";
 
   return (
-    <header className="h-16 bg-white border-b border-[#D9D9D9] flex items-center justify-between px-4 sm:px-6 fixed top-0 left-[306px] w-[calc(100%-306px)] z-30">
-      <div className="flex items-center gap-3">
+    <header className="h-16 bg-white/80 backdrop-blur-sm border-b border-[#00000008] flex items-center justify-between px-4 sm:px-6 fixed top-0 left-[306px] w-[calc(100%-306px)] z-30 shadow-sm">
+      <div className="flex items-center gap-4">
         <button
-          className="lg:hidden p-2 rounded-md text-[color:#1E1E1E] hover:bg-[#F0F0F0]"
+          className="lg:hidden p-2 rounded-lg text-[#666666] hover:bg-[#F8F9FA] hover:text-[#1E1E1E] transition-all duration-200"
           aria-label="Open sidebar"
           onClick={toggleSidebar}
         >
-          ☰
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
         </button>
-        <h1 className="heading-20">{displayTitle}</h1>
+        <div>
+          <h1 className="text-[20px] font-light text-[#1E1E1E]">{displayTitle}</h1>
+        </div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         {actions}
-        <button
-          className="p-2 rounded-md text-[color:#1E1E1E] hover:bg-[#F0F0F0]"
-          aria-label="Notifications"
-        >
-          <Bell className="w-5 h-5" />
-        </button>
-        <div className="flex items-center gap-2">
-          {/* <div className="h-8 w-8 rounded-full bg-[#E5E5E5] overflow-hidden" /> */}
-          <img
-  src="https://api.dicebear.com/9.x/adventurer/svg?seed=Destiny"
-  alt="avatar" className="w-10 h-10" />
-          <ChevronDown className="w-4 h-4 text-[#1E1E1E]" />
+        <div className="relative">
+          <button
+            className="p-2 rounded-lg text-[#666666] hover:bg-[#F8F9FA] hover:text-[#1E1E1E] transition-all duration-200 relative"
+            aria-label="Notifications"
+          >
+            <Bell className="w-5 h-5" strokeWidth={1.5} />
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
+              <span className="text-[10px] text-white font-medium">3</span>
+            </div>
+          </button>
+        </div>
+        <div className="flex items-center gap-3 pl-3 border-l border-[#00000008]">
+          <div className="flex items-center gap-2 cursor-pointer hover:bg-[#F8F9FA] p-2 rounded-lg transition-all duration-200">
+            <img
+              src="https://api.dicebear.com/9.x/adventurer/svg?seed=Admin"
+              alt="Admin avatar" 
+              className="w-8 h-8 rounded-full border border-[#00000008]"
+            />
+            <div className="hidden sm:block">
+              <p className="text-[13px] font-light text-[#1E1E1E]">Iren Kukoma</p>
+              <p className="text-[11px] text-[#999999] font-light">Super Admin</p>
+            </div>
+            <ChevronDown className="w-4 h-4 text-[#666666] ml-1" strokeWidth={1.5} />
+          </div>
         </div>
       </div>
     </header>
