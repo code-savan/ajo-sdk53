@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { PageHeader } from "../../components/ui";
+import Link from "next/link";
 import {
   Settings,
   Globe,
@@ -49,7 +50,8 @@ import {
   TrendingUp,
   Cpu,
   MemoryStick,
-  Network
+  Network,
+  User
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -286,7 +288,16 @@ export default function SettingsPage() {
             {/* Quick Actions */}
             <div className="bg-white/80 backdrop-blur-sm p-6 border border-[#00000008]">
               <h3 className="text-sm font-light uppercase tracking-wider text-[#999999] mb-6">Quick Actions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <Link href="/profile" className="group relative p-4 bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-indigo-200 hover:border-indigo-300  transition-all duration-300 text-left">
+                  <div className="flex items-center justify-between mb-2">
+                    <User className="w-6 h-6 text-indigo-600" strokeWidth={1.5} />
+                    <div className="w-2 h-2 bg-indigo-600 rounded-full" />
+                  </div>
+                  <span className="text-sm font-medium text-indigo-900 block mb-1">My Profile</span>
+                  <span className="text-xs text-indigo-700/70">Manage your account</span>
+                  {/* <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 rounded-b" /> */}
+                </Link>
                 <button
                   onClick={() => setActiveTab('config')}
                   className="group relative p-4 bg-[#FAFAFA] border border-[#00000008] hover:border-[#00000020] transition-all duration-300 text-left"

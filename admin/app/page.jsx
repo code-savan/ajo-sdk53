@@ -136,221 +136,53 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Platform Overview - Tabular Layout */}
+        {/* Platform Overview - Minimal */}
         <div className="bg-white/80 backdrop-blur-sm border border-[#00000008] mb-8">
           <div className="p-6 border-b border-[#00000008]">
             <h3 className="text-lg font-light text-[#1E1E1E]">Platform Overview</h3>
-            <p className="text-xs text-[#999999] mt-1">Key metrics across all platform sections</p>
+            <p className="text-xs text-[#999999] mt-1">Essential platform metrics at a glance</p>
           </div>
           
-          <div className="divide-y divide-[#00000008]">
-            {/* User Management Row */}
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-blue-50/50 border border-blue-100 flex items-center justify-center">
-                  <Users className="w-4 h-4 text-blue-600" strokeWidth={1.5} />
+          <div className="p-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {/* Total Users */}
+              <div className="text-center">
+                <div className="w-12 h-12 bg-blue-50/50 border border-blue-100 flex items-center justify-center mx-auto mb-3">
+                  <Users className="w-6 h-6 text-blue-600" strokeWidth={1.5} />
                 </div>
-                <div>
-                  <h4 className="text-sm font-medium text-[#1E1E1E]">User Management</h4>
-                  <p className="text-xs text-[#999999]">User registrations, verifications, and activity</p>
-                </div>
+                <p className="text-2xl font-light text-[#1E1E1E] mb-1">2,845</p>
+                <p className="text-xs text-[#999999] uppercase tracking-wider mb-1">Total Users</p>
+                <span className="text-xs text-emerald-600 font-medium">+12% this month</span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">2,845</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Total Users</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+12%</span>
+              
+              {/* Active Groups */}
+              <div className="text-center">
+                <div className="w-12 h-12 bg-emerald-50/50 border border-emerald-100 flex items-center justify-center mx-auto mb-3">
+                  <UsersRound className="w-6 h-6 text-emerald-600" strokeWidth={1.5} />
                 </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">2,634</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Verified</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+8%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">156</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">New This Month</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+23%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">94.2%</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Retention Rate</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+2%</span>
-                </div>
+                <p className="text-2xl font-light text-[#1E1E1E] mb-1">142</p>
+                <p className="text-xs text-[#999999] uppercase tracking-wider mb-1">Active Groups</p>
+                <span className="text-xs text-emerald-600 font-medium">+8% this month</span>
               </div>
-            </div>
-
-            {/* Group Management Row */}
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-emerald-50/50 border border-emerald-100 flex items-center justify-center">
-                  <UsersRound className="w-4 h-4 text-emerald-600" strokeWidth={1.5} />
+              
+              {/* Monthly Revenue */}
+              <div className="text-center">
+                <div className="w-12 h-12 bg-amber-50/50 border border-amber-100 flex items-center justify-center mx-auto mb-3">
+                  <DollarSign className="w-6 h-6 text-amber-600" strokeWidth={1.5} />
                 </div>
-                <div>
-                  <h4 className="text-sm font-medium text-[#1E1E1E]">Group Management</h4>
-                  <p className="text-xs text-[#999999]">Group creation, membership, and completion rates</p>
-                </div>
+                <p className="text-2xl font-light text-[#1E1E1E] mb-1">$485K</p>
+                <p className="text-xs text-[#999999] uppercase tracking-wider mb-1">Monthly Revenue</p>
+                <span className="text-xs text-emerald-600 font-medium">+18% this month</span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">142</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Active Groups</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+8%</span>
+              
+              {/* Platform Health */}
+              <div className="text-center">
+                <div className="w-12 h-12 bg-green-50/50 border border-green-100 flex items-center justify-center mx-auto mb-3">
+                  <TrendingUp className="w-6 h-6 text-green-600" strokeWidth={1.5} />
                 </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">1,268</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Total Members</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+15%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">18</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Created This Month</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+6%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">87.5%</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Completion Rate</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+4%</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Financial Management Row */}
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-amber-50/50 border border-amber-100 flex items-center justify-center">
-                  <DollarSign className="w-4 h-4 text-amber-600" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-[#1E1E1E]">Financial Management</h4>
-                  <p className="text-xs text-[#999999]">Transaction volume, revenue, and payouts</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">$12.8M</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Total Volume</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+23%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">$485K</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Monthly Revenue</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+18%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">8,429</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Transactions</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+31%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">$127K</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Pending Payouts</p>
-                  <span className="text-[10px] text-red-600 font-medium">-5%</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Analytics Row */}
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-purple-50/50 border border-purple-100 flex items-center justify-center">
-                  <BarChart3 className="w-4 h-4 text-purple-600" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-[#1E1E1E]">Analytics & Insights</h4>
-                  <p className="text-xs text-[#999999]">Growth metrics, engagement, and performance</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">+23.5%</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Growth Rate</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+5%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">$4,250</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Avg. Savings</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+12%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">96.8%</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Success Rate</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+1%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">78.9%</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">User Engagement</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+7%</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Notifications Row */}
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-violet-50/50 border border-violet-100 flex items-center justify-center">
-                  <Bell className="w-4 h-4 text-violet-600" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-[#1E1E1E]">Notifications & Campaigns</h4>
-                  <p className="text-xs text-[#999999]">Email campaigns, delivery rates, and engagement</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">24</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Active Campaigns</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+3%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">98.2%</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Delivery Rate</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+0.5%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">67.4%</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Open Rate</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+8%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">12.8%</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Click Rate</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+15%</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Security Row */}
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-green-50/50 border border-green-100 flex items-center justify-center">
-                  <Shield className="w-4 h-4 text-green-600" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-[#1E1E1E]">Security & Compliance</h4>
-                  <p className="text-xs text-[#999999]">Security metrics, authentication, and risk management</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">98.5%</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Security Score</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+1%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">23</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Failed Logins</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">-12%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">89.4%</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">2FA Enabled</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">+6%</span>
-                </div>
-                <div className="text-center p-3 bg-[#FAFAFA] border border-[#00000008]">
-                  <p className="text-lg font-light text-[#1E1E1E]">7</p>
-                  <p className="text-[10px] text-[#999999] uppercase tracking-wider">Risk Alerts</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">-18%</span>
-                </div>
+                <p className="text-2xl font-light text-[#1E1E1E] mb-1">96.8%</p>
+                <p className="text-xs text-[#999999] uppercase tracking-wider mb-1">Platform Health</p>
+                <span className="text-xs text-emerald-600 font-medium">All systems good</span>
               </div>
             </div>
           </div>

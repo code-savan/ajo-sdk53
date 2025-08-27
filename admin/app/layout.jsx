@@ -18,19 +18,22 @@ export const metadata = {
 
 import Sidebar from "../components/Sidebar";
 import { SidebarProvider } from "../components/SidebarContext";
+import { LogoutProvider } from "../components/ui";
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[var(--bg-content)] text-[var(--text-primary)]`}>
-        <SidebarProvider>
-          <div className="min-h-screen flex">
-            <Sidebar />
-            <div className="flex-1 flex flex-col overflow-hidden md:pl-[306px]">
-              {children}
+        <LogoutProvider>
+          <SidebarProvider>
+            <div className="min-h-screen flex">
+              <Sidebar />
+              <div className="flex-1 flex flex-col overflow-hidden md:pl-[306px]">
+                {children}
+              </div>
             </div>
-          </div>
-        </SidebarProvider>
+          </SidebarProvider>
+        </LogoutProvider>
       </body>
     </html>
   );

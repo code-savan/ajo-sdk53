@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, UserSquare2, CircleDollarSign, PieChart, Bell, Settings, Headphones, Lock, Shield } from "lucide-react";
+import { Home, Users, UserSquare2, CircleDollarSign, PieChart, Bell, Settings, Headphones, Lock, Shield, LogOut } from "lucide-react";
+import { useLogout } from "./ui";
 
 const mainMenu = [
   { name: "Overview", href: "/", icon: Home },
@@ -22,6 +23,7 @@ const supportMenu = [
 
 export default function Sidebar({ isOpen = false, onClose = () => {} }) {
   const pathname = usePathname();
+  const { setShowLogoutModal } = useLogout();
 
   const NavList = ({ items }) => (
     <div className="space-y-1">
@@ -86,10 +88,17 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
                 <p className="text-[11px] text-[#999999] font-light">Super Admin</p>
               </div>
             </div>
-            <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+            <button
+              onClick={() => setShowLogoutModal(true)}
+              className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4 text-[#666666] group-hover:text-red-600" strokeWidth={1.5} />
+            </button>
           </div>
         </div>
       </aside>
+
 
       {/* Mobile sidebar drawer */}
       <div
