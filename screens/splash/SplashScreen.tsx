@@ -20,11 +20,11 @@ export default function SplashScreen() {
 
   return (
     <View style={styles.container}>
-      <ImageBackground
+      {/* <ImageBackground
         source={require('../../assets/images/bg.png')}
         style={styles.backgroundImage}
         resizeMode="cover"
-      >
+      > */}
         <View style={styles.content}>
           {/* Ajo Logo */}
           <View style={styles.logoContainer}>
@@ -34,7 +34,7 @@ export default function SplashScreen() {
               resizeMode="contain"
             />
           </View>
-          
+
           {/* Tagline */}
           <View style={styles.taglineContainer}>
             <Text style={styles.tagline}>
@@ -42,7 +42,7 @@ export default function SplashScreen() {
             </Text>
           </View>
         </View>
-      </ImageBackground>
+      {/* </ImageBackground> */}
     </View>
   );
 }

@@ -18,11 +18,11 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <ImageBackground
-      source={require('../../assets/images/bg.png')}
-      style={styles.container}
-      resizeMode="cover"
-    >
+    // <ImageBackground
+    //   source={require('../../assets/images/bg.png')}
+    //   style={styles.container}
+    //   resizeMode="cover"
+    // >
       <View style={styles.content}>
         {/* App Logo/Title */}
         <Image
@@ -60,7 +60,7 @@ export default function WelcomeScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-    </ImageBackground>
+    // </ImageBackground>
   );
 }
 

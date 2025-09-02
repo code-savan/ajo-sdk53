@@ -110,6 +110,7 @@ export function PageHeader({ title, actions }) {
       "/financial": "Financial Management",
       "/analytics": "Analytics",
       "/notifications": "Notifications",
+      "/notifications-me": "My Notifications",
       "/admin": "Admin Management",
       "/profile": "Profile",
       "/settings": "Settings",
@@ -163,9 +164,9 @@ export function PageHeader({ title, actions }) {
         {actions}
         <div className="relative">
           <Link
-            href="/notifications"
+            href="/notifications-me"
             className="p-2 rounded-lg text-[#666666] hover:bg-[#F8F9FA] hover:text-[#1E1E1E] transition-all duration-200 relative block"
-            aria-label="Notifications"
+            aria-label="My Notifications"
           >
             <Bell className="w-5 h-5" strokeWidth={1.5} />
             <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">

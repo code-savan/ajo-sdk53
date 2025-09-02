@@ -168,14 +168,14 @@ export default function FinancialPage() {
                 <Banknote className="w-5 h-5 text-[#1E1E1E]" strokeWidth={1.5} />
                 <span className="text-xs text-[#1E1E1E]">Payouts</span>
               </Link>
-              <button className="p-3 border border-[#00000008] hover:border-[#00000020] transition-all duration-200 flex flex-col items-center gap-2">
+              <Link href="/financial/process-refund" className="p-3 border border-[#00000008] hover:border-[#00000020] transition-all duration-200 flex flex-col items-center gap-2">
                 <RefreshCw className="w-5 h-5 text-[#1E1E1E]" strokeWidth={1.5} />
                 <span className="text-xs text-[#1E1E1E]">Process Refunds</span>
-              </button>
-              <button className="p-3 border border-[#00000008] hover:border-[#00000020] transition-all duration-200 flex flex-col items-center gap-2">
+              </Link>
+              <Link href="/financial/generate-report" className="p-3 border border-[#00000008] hover:border-[#00000020] transition-all duration-200 flex flex-col items-center gap-2">
                 <FileText className="w-5 h-5 text-[#1E1E1E]" strokeWidth={1.5} />
                 <span className="text-xs text-[#1E1E1E]">Generate Report</span>
-              </button>
+              </Link>
             </div>
           </div>
           
