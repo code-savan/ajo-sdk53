@@ -64,7 +64,7 @@ export default function NotificationDetailPage() {
           fullContent: `
             <h3>Security Alert Details</h3>
             <p>We've detected unusual activity on your admin account that requires immediate attention:</p>
-            
+
             <h4>Incident Summary</h4>
             <ul>
               <li><strong>Time Period:</strong> January 27, 2025 - 10:15 AM to 10:25 AM WAT</li>
@@ -121,7 +121,7 @@ export default function NotificationDetailPage() {
           fullContent: `
             <h3>Role Request Details</h3>
             <p>A team member has requested a role change that requires your approval:</p>
-            
+
             <h4>Requester Information</h4>
             <ul>
               <li><strong>Name:</strong> Sarah Johnson</li>
@@ -135,7 +135,7 @@ export default function NotificationDetailPage() {
             <h4>Request Details</h4>
             <p><strong>Submitted:</strong> January 26, 2025 at 2:30 PM WAT</p>
             <p><strong>Requested by:</strong> Adaeze Obi (Supervisor)</p>
-            
+
             <h4>Justification</h4>
             <p>Sarah has provided the following justification for this role change:</p>
             <blockquote>
@@ -150,7 +150,7 @@ export default function NotificationDetailPage() {
             <h4>Impact Assessment</h4>
             <ul>
               <li>Will gain access to user management features</li>
-              <li>Can approve transaction disputes up to ₦100,000</li>
+              <li>Can approve transaction disputes up to $100,000</li>
               <li>Access to customer financial information</li>
               <li>Ability to modify user account statuses</li>
             </ul>
@@ -184,7 +184,7 @@ export default function NotificationDetailPage() {
           fullContent: `
             <h3>Scheduled Maintenance Notice</h3>
             <p>Important system maintenance has been scheduled to improve performance and security:</p>
-            
+
             <h4>Maintenance Details</h4>
             <ul>
               <li><strong>Date:</strong> Sunday, January 28, 2025</li>
@@ -254,7 +254,7 @@ export default function NotificationDetailPage() {
         setNotification(notificationData);
         setIsStarred(notificationData.isStarred);
         setIsRead(notificationData.isRead);
-        
+
         // Mark as read when viewed
         if (!notificationData.isRead) {
           setTimeout(() => {
@@ -272,7 +272,7 @@ export default function NotificationDetailPage() {
 
   const getNotificationIcon = (type, priority) => {
     const iconProps = { className: "w-5 h-5", strokeWidth: 1.5 };
-    
+
     switch (type) {
       case "security":
         return <Shield {...iconProps} className={`w-5 h-5 ${priority === "high" ? "text-red-600" : "text-amber-600"}`} />;
@@ -355,7 +355,7 @@ export default function NotificationDetailPage() {
 
   return (
     <div className="flex-1 flex flex-col h-screen pt-[60px] w-full">
-      <PageHeader 
+      <PageHeader
         title="Notification Details"
         actions={
           <Link
@@ -368,7 +368,7 @@ export default function NotificationDetailPage() {
         }
       />
       <main className="flex-1 bg-[#FAFAFA] p-6 overflow-y-auto">
-        
+
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Header Card */}
           <div className="bg-white/80 backdrop-blur-sm border border-[#00000008] p-6">
@@ -377,7 +377,7 @@ export default function NotificationDetailPage() {
                 <div className="flex-shrink-0">
                   {getNotificationIcon(notification.type, notification.priority)}
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4 mb-3">
                     <h1 className="text-xl font-light text-[#1E1E1E] leading-tight">
@@ -386,7 +386,7 @@ export default function NotificationDetailPage() {
                         <span className="inline-block w-2 h-2 bg-blue-500 rounded-full ml-3"></span>
                       )}
                     </h1>
-                    
+
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={`px-3 py-1 text-xs font-medium uppercase tracking-wider border ${getPriorityColor(notification.priority)}`}>
                         {notification.priority} Priority
@@ -404,12 +404,12 @@ export default function NotificationDetailPage() {
                         <Clock className="w-4 h-4" strokeWidth={1.5} />
                         <span>{notification.timestamp.toLocaleString()}</span>
                       </div>
-                      
+
                       <div className="flex items-center gap-1">
                         <Globe className="w-4 h-4" strokeWidth={1.5} />
                         <span className="capitalize">{notification.category}</span>
                       </div>
-                      
+
                       {notification.relatedEntity && (
                         <div className="flex items-center gap-1">
                           <FileText className="w-4 h-4" strokeWidth={1.5} />
@@ -460,7 +460,7 @@ export default function NotificationDetailPage() {
           {/* Full Content */}
           <div className="bg-white/80 backdrop-blur-sm border border-[#00000008] p-6">
             <h3 className="text-lg font-light text-[#1E1E1E] mb-4">Details</h3>
-            <div 
+            <div
               className="prose prose-sm max-w-none text-[#666666] font-light leading-relaxed"
               dangerouslySetInnerHTML={{ __html: notification.fullContent }}
             />

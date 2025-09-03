@@ -101,7 +101,7 @@ export default function NotificationsMePage() {
         type: "transaction",
         priority: "high",
         title: "Large Transaction Flagged for Review",
-        message: "Transaction TXN-789456 for ₦500,000 has been flagged by the fraud detection system and requires manual review.",
+        message: "Transaction TXN-789456 for $500,000 has been flagged by the fraud detection system and requires manual review.",
         timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
         isRead: false,
         isStarred: false,
@@ -166,7 +166,7 @@ export default function NotificationsMePage() {
         type: "group",
         priority: "low",
         title: "New Group Created - Premium Savers",
-        message: "A new savings group 'Premium Savers' has been created with 12 initial members and a monthly contribution of ₦25,000 per member.",
+        message: "A new savings group 'Premium Savers' has been created with 12 initial members and a monthly contribution of $25,000 per member.",
         timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000), // 2 days ago
         isRead: true,
         isStarred: false,
@@ -179,7 +179,7 @@ export default function NotificationsMePage() {
         type: "payout",
         priority: "medium",
         title: "Payout Processing Completed",
-        message: "Monthly payout of ₦300,000 to 'Lagos Entrepreneurs Group' has been processed successfully. All 12 members have been notified.",
+        message: "Monthly payout of $300,000 to 'Lagos Entrepreneurs Group' has been processed successfully. All 12 members have been notified.",
         timestamp: new Date(Date.now() - 72 * 60 * 60 * 1000), // 3 days ago
         isRead: true,
         isStarred: false,
@@ -223,7 +223,7 @@ export default function NotificationsMePage() {
 
   const getNotificationIcon = (type, priority) => {
     const iconProps = { className: "w-4 h-4", strokeWidth: 1.5 };
-    
+
     switch (type) {
       case "security":
         return <Shield {...iconProps} className={`w-4 h-4 ${priority === "high" ? "text-red-600" : "text-amber-600"}`} />;
@@ -264,12 +264,12 @@ export default function NotificationsMePage() {
   const formatTimestamp = (timestamp) => {
     const now = new Date();
     const diff = now - new Date(timestamp);
-    
+
     if (diff < 60 * 1000) return "Just now";
     if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))}m ago`;
     if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))}h ago`;
     if (diff < 7 * 24 * 60 * 60 * 1000) return `${Math.floor(diff / (24 * 60 * 60 * 1000))}d ago`;
-    
+
     return new Date(timestamp).toLocaleDateString();
   };
 
@@ -462,7 +462,7 @@ export default function NotificationsMePage() {
                       <div className="flex-shrink-0 mt-1">
                         {getNotificationIcon(notification.type, notification.priority)}
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <h4 className={`text-sm font-light ${!notification.isRead ? 'text-[#1E1E1E] font-medium' : 'text-[#1E1E1E]'} truncate`}>
@@ -471,18 +471,18 @@ export default function NotificationsMePage() {
                               <span className="inline-block w-2 h-2 bg-blue-500 rounded-full ml-2"></span>
                             )}
                           </h4>
-                          
+
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <span className="text-xs text-[#999999]">
                               {formatTimestamp(notification.timestamp)}
                             </span>
-                            
+
                             {notification.priority === "high" && (
                               <span className="px-2 py-0.5 bg-red-50 text-red-600 text-[10px] uppercase tracking-wider border border-red-100">
                                 High Priority
                               </span>
                             )}
-                            
+
                             {notification.actionRequired && (
                               <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[10px] uppercase tracking-wider border border-amber-100">
                                 Action Required
@@ -500,7 +500,7 @@ export default function NotificationsMePage() {
                             <span className="px-2 py-1 bg-[#FAFAFA] text-[#666666] text-xs capitalize border border-[#00000008]">
                               {notification.category}
                             </span>
-                            
+
                             {notification.relatedEntity && (
                               <span className="text-xs text-[#999999]">
                                 Related: {notification.relatedEntity.type} #{notification.relatedEntity.id}

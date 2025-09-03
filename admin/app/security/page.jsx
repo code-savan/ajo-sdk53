@@ -65,15 +65,15 @@ export default function SecurityPage() {
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [showIncidentModal, setShowIncidentModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
-  
+
   // Mock data for fraud alerts
   const fraudAlerts = [
-    { id: 1, type: 'payment', severity: 'high', user: 'User #u-1045', description: 'Multiple failed payment attempts from different cards', amount: '₦250,000', time: '10 mins ago', status: 'investigating' },
-    { id: 2, type: 'pattern', severity: 'medium', user: 'User #u-2031', description: 'Unusual transaction pattern detected', amount: '₦180,000', time: '25 mins ago', status: 'flagged' },
-    { id: 3, type: 'velocity', severity: 'high', user: 'User #u-3012', description: 'High velocity transactions in short time', amount: '₦450,000', time: '1 hour ago', status: 'blocked' },
+    { id: 1, type: 'payment', severity: 'high', user: 'User #u-1045', description: 'Multiple failed payment attempts from different cards', amount: '$250,000', time: '10 mins ago', status: 'investigating' },
+    { id: 2, type: 'pattern', severity: 'medium', user: 'User #u-2031', description: 'Unusual transaction pattern detected', amount: '$180,000', time: '25 mins ago', status: 'flagged' },
+    { id: 3, type: 'velocity', severity: 'high', user: 'User #u-3012', description: 'High velocity transactions in short time', amount: '$450,000', time: '1 hour ago', status: 'blocked' },
     { id: 4, type: 'location', severity: 'low', user: 'User #u-4001', description: 'Login from new geographic location', amount: '-', time: '2 hours ago', status: 'monitoring' },
   ];
-  
+
   // Mock data for suspicious activities
   const suspiciousActivities = [
     { id: 1, activity: 'Multiple Login Attempts', ip: '192.168.1.45', location: 'Lagos, Nigeria', device: 'Chrome/Windows', time: '5 mins ago', status: 'blocked', riskScore: 85 },
@@ -81,14 +81,14 @@ export default function SecurityPage() {
     { id: 3, activity: 'Unusual IP Access', ip: '45.23.108.91', location: 'Unknown', device: 'Firefox/Linux', time: '30 mins ago', status: 'flagged', riskScore: 75 },
     { id: 4, activity: 'Group Dispute Spike', ip: '172.16.0.5', location: 'Kano, Nigeria', device: 'Chrome/Android', time: '1 hour ago', status: 'investigating', riskScore: 70 },
   ];
-  
+
   // Mock data for AML compliance
   const amlAlerts = [
-    { id: 1, type: 'Large Transaction', amount: '₦5,000,000', parties: 'User #u-1002 → User #u-2003', risk: 'high', status: 'under_review', reportStatus: 'pending', time: '2 hours ago' },
-    { id: 2, type: 'Structured Transactions', amount: '₦2,400,000', parties: 'Multiple Users', risk: 'medium', status: 'flagged', reportStatus: 'not_required', time: '4 hours ago' },
-    { id: 3, type: 'Rapid Fund Movement', amount: '₦1,800,000', parties: 'User #u-3001 → External', risk: 'high', status: 'reported', reportStatus: 'submitted', time: '1 day ago' },
+    { id: 1, type: 'Large Transaction', amount: '$5,000,000', parties: 'User #u-1002 → User #u-2003', risk: 'high', status: 'under_review', reportStatus: 'pending', time: '2 hours ago' },
+    { id: 2, type: 'Structured Transactions', amount: '$2,400,000', parties: 'Multiple Users', risk: 'medium', status: 'flagged', reportStatus: 'not_required', time: '4 hours ago' },
+    { id: 3, type: 'Rapid Fund Movement', amount: '$1,800,000', parties: 'User #u-3001 → External', risk: 'high', status: 'reported', reportStatus: 'submitted', time: '1 day ago' },
   ];
-  
+
   // Mock data for security audits
   const securityAudits = [
     { id: 1, audit: 'Data Encryption Check', lastRun: '2024-01-15 09:00', status: 'passed', issues: 0, nextRun: '2024-01-22 09:00' },
@@ -96,7 +96,7 @@ export default function SecurityPage() {
     { id: 3, audit: 'Database Security Scan', lastRun: '2024-01-13 03:00', status: 'warning', issues: 5, nextRun: '2024-01-20 03:00' },
     { id: 4, audit: 'API Security Test', lastRun: '2024-01-12 18:00', status: 'failed', issues: 12, nextRun: '2024-01-19 18:00' },
   ];
-  
+
   // Mock data for data requests
   const dataRequests = [
     { id: 1, user: 'User #u-1234', type: 'export', requestDate: '2024-01-15', status: 'pending', dataSize: '45 MB', compliance: 'GDPR' },
@@ -104,14 +104,14 @@ export default function SecurityPage() {
     { id: 3, user: 'User #u-3456', type: 'export', requestDate: '2024-01-13', status: 'completed', dataSize: '78 MB', compliance: 'CCPA' },
     { id: 4, user: 'User #u-4567', type: 'deletion', requestDate: '2024-01-12', status: 'completed', dataSize: '234 MB', compliance: 'GDPR' },
   ];
-  
+
   // Mock data for security incidents
   const securityIncidents = [
     { id: 1, incident: 'Brute Force Attack Detected', severity: 'critical', affectedUsers: 45, status: 'contained', responseTime: '2 mins', time: '3 hours ago' },
     { id: 2, incident: 'Suspicious API Activity', severity: 'high', affectedUsers: 12, status: 'investigating', responseTime: '5 mins', time: '6 hours ago' },
     { id: 3, incident: 'Failed Authentication Spike', severity: 'medium', affectedUsers: 89, status: 'resolved', responseTime: '8 mins', time: '1 day ago' },
   ];
-  
+
   const getSeverityColor = (severity) => {
     switch(severity) {
       case 'critical':
@@ -125,7 +125,7 @@ export default function SecurityPage() {
         return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
-  
+
   const getStatusColor = (status) => {
     switch(status) {
       case 'investigating':
@@ -148,7 +148,7 @@ export default function SecurityPage() {
         return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
-  
+
   const getRiskScoreColor = (score) => {
     if (score >= 80) return 'text-red-600';
     if (score >= 60) return 'text-amber-600';
@@ -160,7 +160,7 @@ export default function SecurityPage() {
     <div className="flex-1 flex flex-col h-screen pt-[60px]">
       <PageHeader title="Security Management" />
       <main className="flex-1 bg-[#FAFAFA] p-6 overflow-y-auto">
-        
+
         {/* Security Status Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white/80 backdrop-blur-sm p-4 border border-[#00000008]">
@@ -171,7 +171,7 @@ export default function SecurityPage() {
             <p className="text-2xl font-light text-[#1E1E1E]">12</p>
             <p className="text-[10px] text-[#999999] uppercase tracking-wider mt-1">Fraud Alerts</p>
           </div>
-          
+
           <div className="bg-white/80 backdrop-blur-sm p-4 border border-[#00000008]">
             <div className="flex items-center justify-between mb-2">
               <Activity className="w-5 h-5 text-amber-600" strokeWidth={1.5} />
@@ -180,7 +180,7 @@ export default function SecurityPage() {
             <p className="text-2xl font-light text-[#1E1E1E]">23</p>
             <p className="text-[10px] text-[#999999] uppercase tracking-wider mt-1">Suspicious Activities</p>
           </div>
-          
+
           <div className="bg-white/80 backdrop-blur-sm p-4 border border-[#00000008]">
             <div className="flex items-center justify-between mb-2">
               <ShieldCheck className="w-5 h-5 text-emerald-600" strokeWidth={1.5} />
@@ -189,7 +189,7 @@ export default function SecurityPage() {
             <p className="text-2xl font-light text-[#1E1E1E]">92%</p>
             <p className="text-[10px] text-[#999999] uppercase tracking-wider mt-1">Security Score</p>
           </div>
-          
+
           <div className="bg-white/80 backdrop-blur-sm p-4 border border-[#00000008]">
             <div className="flex items-center justify-between mb-2">
               <AlertOctagon className="w-5 h-5 text-violet-600" strokeWidth={1.5} />
@@ -199,7 +199,7 @@ export default function SecurityPage() {
             <p className="text-[10px] text-[#999999] uppercase tracking-wider mt-1">Incidents Today</p>
           </div>
         </div>
-        
+
         {/* Quick Actions */}
         <div className="flex items-center gap-4 mb-6">
           <button className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center gap-2 text-sm font-light">
@@ -219,14 +219,14 @@ export default function SecurityPage() {
             Security Settings
           </button>
         </div>
-        
+
         {/* Tabs */}
         <div className="flex items-center gap-6 border-b border-[#00000008] mb-6">
           <button
             onClick={() => setActiveTab('overview')}
             className={`pb-3 px-1 text-sm font-light transition-all duration-200 ${
-              activeTab === 'overview' 
-                ? 'text-[#1E1E1E] border-b-2 border-[#1E1E1E]' 
+              activeTab === 'overview'
+                ? 'text-[#1E1E1E] border-b-2 border-[#1E1E1E]'
                 : 'text-[#999999] hover:text-[#1E1E1E]'
             }`}
           >
@@ -235,8 +235,8 @@ export default function SecurityPage() {
           <button
             onClick={() => setActiveTab('fraud')}
             className={`pb-3 px-1 text-sm font-light transition-all duration-200 ${
-              activeTab === 'fraud' 
-                ? 'text-[#1E1E1E] border-b-2 border-[#1E1E1E]' 
+              activeTab === 'fraud'
+                ? 'text-[#1E1E1E] border-b-2 border-[#1E1E1E]'
                 : 'text-[#999999] hover:text-[#1E1E1E]'
             }`}
           >
@@ -245,8 +245,8 @@ export default function SecurityPage() {
           <button
             onClick={() => setActiveTab('monitoring')}
             className={`pb-3 px-1 text-sm font-light transition-all duration-200 ${
-              activeTab === 'monitoring' 
-                ? 'text-[#1E1E1E] border-b-2 border-[#1E1E1E]' 
+              activeTab === 'monitoring'
+                ? 'text-[#1E1E1E] border-b-2 border-[#1E1E1E]'
                 : 'text-[#999999] hover:text-[#1E1E1E]'
             }`}
           >
@@ -255,8 +255,8 @@ export default function SecurityPage() {
           <button
             onClick={() => setActiveTab('aml')}
             className={`pb-3 px-1 text-sm font-light transition-all duration-200 ${
-              activeTab === 'aml' 
-                ? 'text-[#1E1E1E] border-b-2 border-[#1E1E1E]' 
+              activeTab === 'aml'
+                ? 'text-[#1E1E1E] border-b-2 border-[#1E1E1E]'
                 : 'text-[#999999] hover:text-[#1E1E1E]'
             }`}
           >
@@ -265,8 +265,8 @@ export default function SecurityPage() {
           <button
             onClick={() => setActiveTab('privacy')}
             className={`pb-3 px-1 text-sm font-light transition-all duration-200 ${
-              activeTab === 'privacy' 
-                ? 'text-[#1E1E1E] border-b-2 border-[#1E1E1E]' 
+              activeTab === 'privacy'
+                ? 'text-[#1E1E1E] border-b-2 border-[#1E1E1E]'
                 : 'text-[#999999] hover:text-[#1E1E1E]'
             }`}
           >
@@ -275,15 +275,15 @@ export default function SecurityPage() {
           <button
             onClick={() => setActiveTab('incidents')}
             className={`pb-3 px-1 text-sm font-light transition-all duration-200 ${
-              activeTab === 'incidents' 
-                ? 'text-[#1E1E1E] border-b-2 border-[#1E1E1E]' 
+              activeTab === 'incidents'
+                ? 'text-[#1E1E1E] border-b-2 border-[#1E1E1E]'
                 : 'text-[#999999] hover:text-[#1E1E1E]'
             }`}
           >
             Incident Response
           </button>
         </div>
-        
+
         {/* Tab Content */}
         <div className="space-y-6">
           {/* Overview Tab */}
@@ -320,7 +320,7 @@ export default function SecurityPage() {
                     ))}
                   </div>
                 </div>
-                
+
                 {/* Security Health */}
                 <div className="bg-white/80 backdrop-blur-sm border border-[#00000008] p-6">
                   <h3 className="text-sm font-light uppercase tracking-wider text-[#999999] mb-4">Security Health</h3>
@@ -364,7 +364,7 @@ export default function SecurityPage() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Activity Summary */}
               <div className="bg-white/80 backdrop-blur-sm border border-[#00000008] p-6">
                 <h3 className="text-sm font-light uppercase tracking-wider text-[#999999] mb-4">24 Hour Activity Summary</h3>
@@ -405,7 +405,7 @@ export default function SecurityPage() {
               </div>
             </>
           )}
-          
+
           {/* Fraud Detection Tab */}
           {activeTab === 'fraud' && (
             <div className="space-y-6">
@@ -487,7 +487,7 @@ export default function SecurityPage() {
                   </table>
                 </div>
               </div>
-              
+
               {/* Fraud Prevention Rules */}
               <div className="bg-white/80 backdrop-blur-sm border border-[#00000008] p-6">
                 <h3 className="text-sm font-light uppercase tracking-wider text-[#999999] mb-4">Active Prevention Rules</h3>
@@ -499,7 +499,7 @@ export default function SecurityPage() {
                         <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
                       </div>
                     </div>
-                    <p className="text-xs text-[#999999]">Block transactions exceeding ₦500,000 within 1 hour</p>
+                    <p className="text-xs text-[#999999]">Block transactions exceeding $500,000 within 1 hour</p>
                   </div>
                   <div className="p-4 border border-[#00000008]">
                     <div className="flex items-center justify-between mb-2">
@@ -532,7 +532,7 @@ export default function SecurityPage() {
               </div>
             </div>
           )}
-          
+
           {/* Activity Monitoring Tab */}
           {activeTab === 'monitoring' && (
             <div className="space-y-6">
@@ -578,7 +578,7 @@ export default function SecurityPage() {
                           <td className="p-3">
                             <div className="flex items-center gap-2">
                               <div className="w-16 h-1.5 bg-[#00000008]">
-                                <div 
+                                <div
                                   className={`h-full ${
                                     activity.riskScore >= 80 ? 'bg-red-500' :
                                     activity.riskScore >= 60 ? 'bg-amber-500' :
@@ -618,7 +618,7 @@ export default function SecurityPage() {
               </div>
             </div>
           )}
-          
+
           {/* AML Compliance Tab */}
           {activeTab === 'aml' && (
             <div className="space-y-6">
@@ -627,7 +627,7 @@ export default function SecurityPage() {
                   <div className="flex items-center justify-between mb-2">
                     <DollarSign className="w-5 h-5 text-amber-600" strokeWidth={1.5} />
                   </div>
-                  <p className="text-2xl font-light text-[#1E1E1E]">₦12.5M</p>
+                  <p className="text-2xl font-light text-[#1E1E1E]">$12.5M</p>
                   <p className="text-[10px] text-[#999999] uppercase tracking-wider mt-1">Daily Transaction Volume</p>
                 </div>
                 <div className="bg-white/80 backdrop-blur-sm p-4 border border-[#00000008]">
@@ -645,7 +645,7 @@ export default function SecurityPage() {
                   <p className="text-[10px] text-[#999999] uppercase tracking-wider mt-1">Compliance Score</p>
                 </div>
               </div>
-              
+
               <div className="bg-white/80 backdrop-blur-sm border border-[#00000008]">
                 <div className="p-4 border-b border-[#00000008]">
                   <h3 className="text-sm font-light uppercase tracking-wider text-[#999999]">AML Alerts & Reports</h3>
@@ -710,7 +710,7 @@ export default function SecurityPage() {
               </div>
             </div>
           )}
-          
+
           {/* Data Privacy Tab */}
           {activeTab === 'privacy' && (
             <div className="space-y-6">
@@ -750,7 +750,7 @@ export default function SecurityPage() {
                   ))}
                 </div>
               </div>
-              
+
               {/* Data Requests */}
               <div className="bg-white/80 backdrop-blur-sm border border-[#00000008]">
                 <div className="p-4 border-b border-[#00000008]">
@@ -821,7 +821,7 @@ export default function SecurityPage() {
               </div>
             </div>
           )}
-          
+
           {/* Incident Response Tab */}
           {activeTab === 'incidents' && (
             <div className="space-y-6">
@@ -848,7 +848,7 @@ export default function SecurityPage() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Active Incidents */}
               <div className="bg-white/80 backdrop-blur-sm border border-[#00000008]">
                 <div className="p-4 border-b border-[#00000008]">
@@ -886,7 +886,7 @@ export default function SecurityPage() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Incident Response Log */}
               <div className="bg-white/80 backdrop-blur-sm border border-[#00000008] p-6">
                 <h3 className="text-sm font-light uppercase tracking-wider text-[#999999] mb-4">Response Log</h3>

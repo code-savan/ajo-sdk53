@@ -67,7 +67,7 @@ export default function ProcessRefundPage() {
         userEmail: "john.doe@email.com",
         phone: "+234 813 456 7890",
         amount: 50000,
-        currency: "NGN",
+        currency: "USD",
         reason: "Unauthorized transaction",
         description: "Customer claims they did not authorize this transaction. Bank statement shows no record of user initiating this payment.",
         status: "pending",
@@ -95,7 +95,7 @@ export default function ProcessRefundPage() {
         userEmail: "adaeze.okafor@email.com",
         phone: "+234 801 234 5678",
         amount: 25000,
-        currency: "NGN",
+        currency: "USD",
         reason: "Service not received",
         description: "Customer paid for premium membership but features were not unlocked. Technical issue confirmed on our end.",
         status: "approved",
@@ -127,7 +127,7 @@ export default function ProcessRefundPage() {
         userEmail: "emeka.nwosu@email.com",
         phone: "+234 812 345 6789",
         amount: 15000,
-        currency: "NGN",
+        currency: "USD",
         reason: "Duplicate charge",
         description: "Transaction was processed twice due to network timeout. Customer was charged twice for the same service.",
         status: "processing",
@@ -155,7 +155,7 @@ export default function ProcessRefundPage() {
         userEmail: "blessing.adebayo@email.com",
         phone: "+234 909 876 5432",
         amount: 100000,
-        currency: "NGN",
+        currency: "USD",
         reason: "Fraudulent transaction",
         description: "Suspicious transaction pattern detected. User's account may have been compromised. Immediate refund requested as part of fraud protection.",
         status: "investigating",
@@ -184,7 +184,7 @@ export default function ProcessRefundPage() {
         userEmail: "kemi.ogundipe@email.com",
         phone: "+234 708 123 4567",
         amount: 5000,
-        currency: "NGN",
+        currency: "USD",
         reason: "Accidental payment",
         description: "Customer accidentally made payment for wrong service. Requesting refund to process correct payment.",
         status: "rejected",
@@ -278,8 +278,8 @@ export default function ProcessRefundPage() {
     }
   };
 
-  const formatCurrency = (amount, currency = "NGN") => {
-    return new Intl.NumberFormat('en-NG', {
+  const formatCurrency = (amount, currency = "USD") => {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 0
@@ -289,18 +289,18 @@ export default function ProcessRefundPage() {
   const formatTimestamp = (timestamp) => {
     const now = new Date();
     const diff = now - new Date(timestamp);
-    
+
     if (diff < 60 * 1000) return "Just now";
     if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))}m ago`;
     if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))}h ago`;
     if (diff < 7 * 24 * 60 * 60 * 1000) return `${Math.floor(diff / (24 * 60 * 60 * 1000))}d ago`;
-    
+
     return new Date(timestamp).toLocaleDateString();
   };
 
   const handleSelectRefund = (refundId) => {
-    setSelectedRefunds(prev => 
-      prev.includes(refundId) 
+    setSelectedRefunds(prev =>
+      prev.includes(refundId)
         ? prev.filter(id => id !== refundId)
         : [...prev, refundId]
     );
@@ -324,11 +324,11 @@ export default function ProcessRefundPage() {
   const handleRefundAction = (refundId, action) => {
     console.log(`${action} refund:`, refundId);
     // In real app, this would make API call
-    setRefunds(prev => 
-      prev.map(refund => 
-        refund.id === refundId 
-          ? { 
-              ...refund, 
+    setRefunds(prev =>
+      prev.map(refund =>
+        refund.id === refundId
+          ? {
+              ...refund,
               status: action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : refund.status,
               processedAt: new Date(),
               processedBy: 'Current Admin'
@@ -349,10 +349,10 @@ export default function ProcessRefundPage() {
 
   const amountOptions = [
     { value: "all", label: "All Amounts" },
-    { value: "under_10k", label: "Under ₦10,000" },
-    { value: "10k_50k", label: "₦10,000 - ₦50,000" },
-    { value: "50k_100k", label: "₦50,000 - ₦100,000" },
-    { value: "over_100k", label: "Over ₦100,000" }
+    { value: "under_10k", label: "Under $10,000" },
+    { value: "10k_50k", label: "$10,000 - $50,000" },
+    { value: "50k_100k", label: "$50,000 - $100,000" },
+    { value: "over_100k", label: "Over $100,000" }
   ];
 
   const stats = {
@@ -367,9 +367,9 @@ export default function ProcessRefundPage() {
   return (
     <div className="flex-1 flex flex-col h-screen pt-[60px] w-full">
       <PageHeader title="Process Refunds" />
-      
+
       <main className="flex-1 bg-[#FAFAFA] p-6 overflow-y-auto">
-        
+
         {/* Back Navigation */}
         <Link href="/financial" className="inline-flex items-center gap-2 text-sm text-[#999999] hover:text-[#1E1E1E] transition-colors mb-6">
           <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
@@ -556,7 +556,7 @@ export default function ProcessRefundPage() {
                     className="w-4 h-4"
                   />
                   <span className="text-sm font-light text-[#1E1E1E]">
-                    {selectedRefunds.length > 0 
+                    {selectedRefunds.length > 0
                       ? `${selectedRefunds.length} selected`
                       : `${filteredRefunds.length} refund${filteredRefunds.length > 1 ? 's' : ''}`}
                   </span>
@@ -594,7 +594,7 @@ export default function ProcessRefundPage() {
                                 <AlertTriangle className="w-4 h-4 text-red-600" strokeWidth={1.5} />
                               )}
                             </div>
-                            
+
                             <div className="flex items-center gap-6 text-xs text-[#999999] mb-2">
                               <span>Transaction: {refund.transactionId}</span>
                               <span>Amount: {formatCurrency(refund.amount, refund.currency)}</span>
@@ -672,7 +672,7 @@ export default function ProcessRefundPage() {
                                 </button>
                               </>
                             )}
-                            
+
                             {refund.status === 'investigating' && (
                               <button
                                 onClick={() => handleRefundAction(refund.id, 'process')}

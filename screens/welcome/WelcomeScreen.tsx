@@ -75,6 +75,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 80,
     paddingBottom: 50,
+    backgroundColor: "#FFFFFF"
   },
   appTitle: {
     fontSize: 48,

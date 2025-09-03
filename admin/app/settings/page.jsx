@@ -78,7 +78,7 @@ export default function SettingsPage() {
     general: {
       appName: 'AJO Savings Platform',
       timezone: 'Africa/Lagos',
-      defaultCurrency: 'NGN',
+      defaultCurrency: 'USD',
       maintenanceMode: false,
       debugMode: false,
       environment: 'production'
@@ -437,7 +437,7 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-sm font-light text-[#1E1E1E] mb-2">Default Currency</label>
                     <select className="w-full px-4 py-2 bg-[#FAFAFA] border border-[#00000008] text-sm font-light focus:outline-none focus:border-[#00000020] transition-colors">
-                      <option value="NGN">Nigerian Naira (NGN)</option>
+                      <option value="USD">Nigerian Naira (USD)</option>
                       <option value="USD">US Dollar (USD)</option>
                       <option value="GBP">British Pound (GBP)</option>
                     </select>
@@ -479,7 +479,7 @@ export default function SettingsPage() {
               <h3 className="text-sm font-light uppercase tracking-wider text-[#999999] mb-6">Contribution Settings</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-light text-[#1E1E1E] mb-2">Min Contribution (NGN)</label>
+                  <label className="block text-sm font-light text-[#1E1E1E] mb-2">Min Contribution (USD)</label>
                   <input
                     type="number"
                     defaultValue={appConfig.contributions.minContribution}
@@ -487,7 +487,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-light text-[#1E1E1E] mb-2">Max Contribution (NGN)</label>
+                  <label className="block text-sm font-light text-[#1E1E1E] mb-2">Max Contribution (USD)</label>
                   <input
                     type="number"
                     defaultValue={appConfig.contributions.maxContribution}
@@ -526,7 +526,7 @@ export default function SettingsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-light text-[#1E1E1E] mb-2">Min Withdrawal (NGN)</label>
+                  <label className="block text-sm font-light text-[#1E1E1E] mb-2">Min Withdrawal (USD)</label>
                   <input
                     type="number"
                     defaultValue={appConfig.payouts.minWithdrawal}
@@ -534,7 +534,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-light text-[#1E1E1E] mb-2">Processing Fee (NGN)</label>
+                  <label className="block text-sm font-light text-[#1E1E1E] mb-2">Processing Fee (USD)</label>
                   <input
                     type="number"
                     defaultValue={appConfig.payouts.processingFee}

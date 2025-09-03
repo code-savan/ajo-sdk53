@@ -78,7 +78,7 @@ export default function GenerateReportPage() {
         format: "pdf"
       },
       {
-        id: "SCH002", 
+        id: "SCH002",
         name: "Monthly Transaction Report",
         type: "transaction_details",
         frequency: "monthly",
@@ -205,20 +205,20 @@ export default function GenerateReportPage() {
   const generatePreviewData = (type) => {
     const baseData = {
       financial_summary: {
-        totalRevenue: "₦2,450,000",
+        totalRevenue: "$2,450,000",
         totalTransactions: 1856,
-        averageTransaction: "₦1,320",
+        averageTransaction: "$1,320",
         successRate: "94.5%",
         topMetrics: [
           { label: "Revenue Growth", value: "+12.5%", trend: "up" },
           { label: "Transaction Volume", value: "+8.2%", trend: "up" },
           { label: "Failed Rate", value: "-2.1%", trend: "down" },
-          { label: "Average Fee", value: "₦45", trend: "neutral" }
+          { label: "Average Fee", value: "$45", trend: "neutral" }
         ]
       },
       transaction_details: {
         totalCount: 1856,
-        totalVolume: "₦2,450,000",
+        totalVolume: "$2,450,000",
         byStatus: {
           successful: 1754,
           failed: 68,
@@ -243,10 +243,10 @@ export default function GenerateReportPage() {
 
   const handleGenerateReport = async () => {
     setIsGenerating(true);
-    
+
     // Simulate report generation
     await new Promise(resolve => setTimeout(resolve, 3000));
-    
+
     const reportData = generatePreviewData(reportType);
     setPreviewData(reportData);
     setIsGenerating(false);
@@ -275,7 +275,7 @@ export default function GenerateReportPage() {
 
   const handleFilterToggle = (filterId, value) => {
     const filterKey = `${filterId}:${value}`;
-    setSelectedFilters(prev => 
+    setSelectedFilters(prev =>
       prev.includes(filterKey)
         ? prev.filter(f => f !== filterKey)
         : [...prev, filterKey]
@@ -309,9 +309,9 @@ export default function GenerateReportPage() {
   return (
     <div className="flex-1 flex flex-col h-screen pt-[60px] w-full">
       <PageHeader title="Generate Reports" />
-      
+
       <main className="flex-1 bg-[#FAFAFA] p-6 overflow-y-auto">
-        
+
         {/* Back Navigation */}
         <Link href="/financial" className="inline-flex items-center gap-2 text-sm text-[#999999] hover:text-[#1E1E1E] transition-colors mb-6">
           <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
@@ -391,8 +391,8 @@ export default function GenerateReportPage() {
                       key={type.id}
                       onClick={() => setReportType(type.id)}
                       className={`p-4 border cursor-pointer transition-all duration-200 hover:border-[#00000020] ${
-                        isSelected 
-                          ? 'border-blue-500 bg-blue-50/50' 
+                        isSelected
+                          ? 'border-blue-500 bg-blue-50/50'
                           : 'border-[#00000008] hover:bg-[#FAFAFA]'
                       }`}
                     >
@@ -424,7 +424,7 @@ export default function GenerateReportPage() {
             {/* Date Range & Filters */}
             <div className="bg-white/80 backdrop-blur-sm border border-[#00000008] p-6">
               <h3 className="text-lg font-light text-[#1E1E1E] mb-4">Configure Parameters</h3>
-              
+
               <div className="space-y-4">
                 {/* Date Range */}
                 <div>
@@ -480,8 +480,8 @@ export default function GenerateReportPage() {
                           key={fmt.value}
                           onClick={() => setFormat(fmt.value)}
                           className={`p-3 border text-left transition-colors ${
-                            isSelected 
-                              ? 'border-blue-500 bg-blue-50/50 text-blue-900' 
+                            isSelected
+                              ? 'border-blue-500 bg-blue-50/50 text-blue-900'
                               : 'border-[#00000008] hover:border-[#00000020] text-[#1E1E1E]'
                           }`}
                         >
@@ -534,8 +534,8 @@ export default function GenerateReportPage() {
                                 key={value}
                                 onClick={() => handleFilterToggle(filter.id, value)}
                                 className={`px-3 py-1 text-xs border transition-colors ${
-                                  isSelected 
-                                    ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                                  isSelected
+                                    ? 'border-blue-500 bg-blue-50 text-blue-700'
                                     : 'border-[#00000008] hover:border-[#00000020] text-[#666666]'
                                 }`}
                               >
@@ -630,7 +630,7 @@ export default function GenerateReportPage() {
                             <div key={index} className="flex items-center justify-between text-xs">
                               <span className="text-[#666666]">{metric.label}</span>
                               <span className={`font-medium ${
-                                metric.trend === 'up' ? 'text-emerald-600' : 
+                                metric.trend === 'up' ? 'text-emerald-600' :
                                 metric.trend === 'down' ? 'text-red-600' : 'text-[#1E1E1E]'
                               }`}>
                                 {metric.value}
@@ -659,14 +659,14 @@ export default function GenerateReportPage() {
                   <Plus className="w-4 h-4 text-[#999999]" strokeWidth={1.5} />
                 </button>
               </div>
-              
+
               <div className="space-y-3">
                 {scheduledReports.slice(0, 3).map((report) => (
                   <div key={report.id} className="p-3 border border-[#00000008] hover:border-[#00000020] transition-colors">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h4 className="text-sm font-medium text-[#1E1E1E] line-clamp-1">{report.name}</h4>
                       <span className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider border ${
-                        report.status === 'active' 
+                        report.status === 'active'
                           ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
                           : 'bg-amber-50 text-amber-600 border-amber-200'
                       }`}>
@@ -689,7 +689,7 @@ export default function GenerateReportPage() {
                     </div>
                   </div>
                 ))}
-                
+
                 {scheduledReports.length > 3 && (
                   <button className="w-full text-center py-2 text-xs text-blue-600 hover:text-blue-700 transition-colors">
                     View all scheduled reports →

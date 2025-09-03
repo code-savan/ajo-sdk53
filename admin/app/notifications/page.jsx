@@ -57,8 +57,8 @@ export default function NotificationsPage() {
 
   // Mock data for push notifications
   const pushNotifications = [
-    { id: 1, title: 'Payment Due Reminder', message: 'Your payment of ₦25,000 is due tomorrow', status: 'sent', sentTo: 245, opened: 189, time: '2 hours ago', type: 'payment' },
-    { id: 2, title: 'Payout Completed', message: 'Your payout of ₦150,000 has been processed', status: 'sent', sentTo: 12, opened: 12, time: '4 hours ago', type: 'payout' },
+    { id: 1, title: 'Payment Due Reminder', message: 'Your payment of $25,000 is due tomorrow', status: 'sent', sentTo: 245, opened: 189, time: '2 hours ago', type: 'payment' },
+    { id: 2, title: 'Payout Completed', message: 'Your payout of $150,000 has been processed', status: 'sent', sentTo: 12, opened: 12, time: '4 hours ago', type: 'payout' },
     { id: 3, title: 'Group Invitation', message: 'You have been invited to join Premium Savers', status: 'scheduled', sentTo: 0, opened: 0, time: 'Tomorrow 9:00 AM', type: 'group' },
     { id: 4, title: 'System Maintenance', message: 'Scheduled maintenance on Sunday 2-4 AM', status: 'draft', sentTo: 0, opened: 0, time: 'Not sent', type: 'system' },
   ];
