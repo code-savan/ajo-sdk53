@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { PageHeader } from "../../components/ui";
+import Link from "next/link";
 import {
   Shield,
   Users,
@@ -534,12 +535,68 @@ export default function AdminManagementPage() {
           </div>
         </div>
 
+        {/* Admin Users Section */}
+        <div className="bg-white/80 backdrop-blur-sm border border-[#00000008] p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-light text-[#1E1E1E] flex items-center gap-3">
+                <Users className="w-5 h-5 text-blue-600" strokeWidth={1.5} />
+                Admin Users Management
+              </h3>
+              <p className="text-[#999999] text-xs mt-1 font-light">
+                Manage administrator accounts, permissions, and access control
+              </p>
+            </div>
+            <Link
+              href="/admin/users"
+              className="px-6 py-3 bg-[#1E1E1E] text-white text-sm font-light hover:bg-[#2E2E2E] transition-colors flex items-center gap-2"
+            >
+              <Users className="w-4 h-4" strokeWidth={1.5} />
+              Manage Admin Users
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="p-4 border border-[#00000008] hover:border-[#00000020] transition-colors">
+              <div className="flex items-center justify-between mb-2">
+                <UserCheck className="w-5 h-5 text-emerald-600" strokeWidth={1.5} />
+                <span className="text-xs text-emerald-600">10</span>
+              </div>
+              <p className="text-2xl font-light text-[#1E1E1E]">15</p>
+              <p className="text-[10px] text-[#999999] uppercase tracking-wider mt-1">Total Admins</p>
+            </div>
+            <div className="p-4 border border-[#00000008] hover:border-[#00000020] transition-colors">
+              <div className="flex items-center justify-between mb-2">
+                <Activity className="w-5 h-5 text-blue-600" strokeWidth={1.5} />
+                <span className="text-xs text-blue-600">7</span>
+              </div>
+              <p className="text-2xl font-light text-[#1E1E1E]">7</p>
+              <p className="text-[10px] text-[#999999] uppercase tracking-wider mt-1">Active Sessions</p>
+            </div>
+            <div className="p-4 border border-[#00000008] hover:border-[#00000020] transition-colors">
+              <div className="flex items-center justify-between mb-2">
+                <Clock className="w-5 h-5 text-amber-600" strokeWidth={1.5} />
+                <span className="text-xs text-amber-600">2</span>
+              </div>
+              <p className="text-2xl font-light text-[#1E1E1E]">2</p>
+              <p className="text-[10px] text-[#999999] uppercase tracking-wider mt-1">Pending Invites</p>
+            </div>
+            <div className="p-4 border border-[#00000008] hover:border-[#00000020] transition-colors">
+              <div className="flex items-center justify-between mb-2">
+                <Shield className="w-5 h-5 text-violet-600" strokeWidth={1.5} />
+                <span className="text-xs text-violet-600">11</span>
+              </div>
+              <p className="text-2xl font-light text-[#1E1E1E]">11</p>
+              <p className="text-[10px] text-[#999999] uppercase tracking-wider mt-1">2FA Enabled</p>
+            </div>
+          </div>
+        </div>
+
         {/* Tabs */}
         <div className="flex items-center gap-6 mb-6 border-b border-[#00000008] overflow-x-auto">
           {[
             { key: 'overview', label: 'Admin Overview' },
             { key: 'roles', label: 'Role Management' },
-            { key: 'admins', label: 'Admin Users' },
             { key: 'requests', label: 'Role Requests' },
             { key: 'permissions', label: 'Permissions' },
             { key: 'sessions', label: 'Active Sessions' },
@@ -555,13 +612,6 @@ export default function AdminManagementPage() {
               }`}
             >
               {tab.label}
-              {/* {tab.key === 'requests' && roleRequests.filter(r => r.status === 'pending').length > 0 && (
-                <div className="absolute -top-2 -right-2 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
-                  <span className="text-[10px] text-white font-medium">
-                    {roleRequests.filter(r => r.status === 'pending').length}
-                  </span>
-                </div>
-              )} */}
             </button>
           ))}
         </div>
