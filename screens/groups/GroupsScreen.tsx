@@ -1,14 +1,49 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, ChevronRight, Calendar, Users, DollarSign } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import BottomNavigation from '../../components/BottomNavigation';
+import { apiGet } from '../../lib/api';
 
 export default function GroupsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [activeCount, setActiveCount] = useState<number>(0);
+  const [pickupCount, setPickupCount] = useState<number>(0);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const [groupData, txns] = await Promise.all([
+          apiGet<any[]>('/api/groups').catch(() => []),
+          apiGet<any[]>('/api/me/transactions?limit=500').catch(() => []),
+        ]);
+        const grp = Array.isArray(groupData) ? groupData : [];
+        setGroups(grp);
+        // Active groups: prefer explicit status === 'active'; fall back to total length if statuses are absent
+        let act = grp.filter((g: any) => g?.status === 'active').length;
+        if (act === 0 && grp.some((g: any) => g?.status === undefined)) act = grp.length;
+        setActiveCount(act);
+        // Times collected: count rotation_earning credits
+        const t = Array.isArray(txns) ? txns : [];
+        const pickups = t.filter((r: any) => r?.source === 'rotation_earning' && r?.direction === 'credit').length;
+        setPickupCount(pickups);
+      } catch (e: any) {
+        setError('Failed to load groups');
+      } finally {
+        setLoading(false);
+      }
+    };
+    const unsubscribe = navigation.addListener('focus', load);
+    load();
+    return unsubscribe;
+  }, [navigation]);
 
   const handleCreateGroup = () => {
     navigation.navigate('CreateGroup');
@@ -17,18 +52,23 @@ export default function GroupsScreen() {
   const handleViewAllGroups = () => {
     navigation.navigate('AllGroups');
   };
-  
+
   const handleNotificationsPress = () => {
     navigation.navigate('Notifications');
   };
 
-  const handleGroupPress = (groupName: string, groupId: string) => {
-    navigation.navigate('GroupDetail', { groupName, groupId });
+  const handleGroupPress = (groupName: string, groupId: string, amount?: string, memberCount?: number, monthlyContribution?: string, date?: string) => {
+    navigation.navigate('GroupDetail', { groupName, groupId, amount, memberCount, monthlyContribution, date });
+  };
+
+  const formatStat = (n: number) => {
+    if (!n) return '0';
+    return n < 10 ? `0${n}` : String(n);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -41,29 +81,21 @@ export default function GroupsScreen() {
           <View style={styles.notificationContainer}>
             <TouchableOpacity style={styles.notificationButton} onPress={handleNotificationsPress}>
               <Bell width={24} height={24} color="#6b7280" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>3</Text>
-              </View>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Content */}
         <View style={styles.content}>
-          {/* Stats Cards */}
-          <View style={styles.statsContainer}>
-            {/* Active Groups Card */}
+          {/* Stats Row */}
+          <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statDescription}>
-                Your total active groups{"\n"}at a glance.
-              </Text>
-              <Text style={styles.statNumber}>03</Text>
+              <Text style={styles.statTop}>Your total active groups{"\n"}at a glance.</Text>
+              <Text style={styles.statValue}>{formatStat(activeCount)}</Text>
             </View>
-
-            {/* Collections Card */}
             <View style={styles.statCard}>
-              <Text style={styles.statDescription}>Total times you have{"\n"}collected.</Text>
-              <Text style={styles.statNumber}>12</Text>
+              <Text style={styles.statTop}>Total times you have{"\n"}collected.</Text>
+              <Text style={styles.statValue}>{formatStat(pickupCount)}</Text>
             </View>
           </View>
 
@@ -81,113 +113,51 @@ export default function GroupsScreen() {
             <Text style={styles.groupsTitle}>Groups</Text>
             <Text style={styles.groupsDescription}>Take a look at your current groups.</Text>
 
-            {/* Hawaii Vacation Group */}
-            <TouchableOpacity 
-              style={styles.groupItem}
-              onPress={() => handleGroupPress('Hawaii Vacation', 'hawaii-vacation')}
-            >
-              <View style={styles.groupContent}>
-                <View style={styles.groupIcon}>
-                  {/* Simple map-like background with coin icon */}
-                  <View style={styles.groupIconBg}>
-                    <View style={styles.iconBadge}>
-                      <Text style={styles.iconBadgeText}>5</Text>
+            {loading ? (
+              <ActivityIndicator style={{ marginTop: 16 }} />
+            ) : error ? (
+              <Text style={styles.emptyText}>{error}</Text>
+            ) : groups.length === 0 ? (
+              <Text style={styles.emptyText}>No groups yet. Create your first group to get started.</Text>
+            ) : (
+              groups.map((g) => (
+                <TouchableOpacity
+                  key={g.id}
+                  style={styles.groupItem}
+                  onPress={() => handleGroupPress(g.name, g.id, undefined, g.size, `${(g.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()})} / ${g.frequency}`, undefined)}
+                >
+                  <View style={styles.groupContent}>
+                    <View style={styles.groupIcon}>
+                      <View style={styles.groupIconBg} />
+                    </View>
+                    <View style={styles.groupInfo}>
+                      <Text style={styles.groupTitle}>{g.name}</Text>
+                      <Text style={styles.groupAmount}>{(g.goal_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()})}</Text>
+                      <View style={styles.groupMeta}>
+                        <View style={styles.metaItem}>
+                          <Calendar width={16} height={16} color="#2563eb" />
+                          <Text style={styles.metaText}>{g.next_charge_at ? new Date(g.next_charge_at).toLocaleDateString() : '-'}</Text>
+                        </View>
+                        <View style={styles.metaItem}>
+                          <Users width={16} height={16} color="#2563eb" />
+                          <Text style={styles.metaText}>{g.size}</Text>
+                        </View>
+                        <View style={styles.metaItem}>
+                          <DollarSign width={16} height={16} color="#2563eb" />
+                          <Text style={styles.metaText}>{(g.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()})}</Text>
+                        </View>
+                      </View>
                     </View>
                   </View>
-                </View>
-                <View style={styles.groupInfo}>
-                  <Text style={styles.groupTitle}>Hawaii Vacation</Text>
-                  <Text style={styles.groupAmount}>$1,500.00</Text>
-                  <View style={styles.groupMeta}>
-                    <View style={styles.metaItem}>
-                      <Calendar width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>1/07/2025</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Users width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>15</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <DollarSign width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>$100 / mnth</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
+                </TouchableOpacity>
+              ))
+            )}
 
-            {/* Cooking Fees Group */}
-            <TouchableOpacity 
-              style={styles.groupItem}
-              onPress={() => handleGroupPress('Cooking Fees', 'cooking-fees')}
-            >
-              <View style={styles.groupContent}>
-                <View style={styles.groupIcon}>
-                  <View style={styles.groupIconBg}>
-                    <View style={styles.iconBadge}>
-                      <Text style={styles.iconBadgeText}>5</Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.groupInfo}>
-                  <Text style={styles.groupTitle}>Cooking Fees</Text>
-                  <Text style={styles.groupAmount}>$1,000.00</Text>
-                  <View style={styles.groupMeta}>
-                    <View style={styles.metaItem}>
-                      <Calendar width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>1/07/2025</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Users width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>10</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <DollarSign width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>$100 / mnth</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            {/* TV Prep Group */}
-            <TouchableOpacity 
-              style={styles.groupItem}
-              onPress={() => handleGroupPress('TV Prep', 'tv-prep')}
-            >
-              <View style={styles.groupContent}>
-                <View style={styles.groupIcon}>
-                  <View style={styles.groupIconBg}>
-                    <View style={styles.iconBadge}>
-                      <Text style={styles.iconBadgeText}>5</Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.groupInfo}>
-                  <Text style={styles.groupTitle}>TV Prep</Text>
-                  <Text style={styles.groupAmount}>$1,000.00</Text>
-                  <View style={styles.groupMeta}>
-                    <View style={styles.metaItem}>
-                      <Calendar width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>1/07/2025</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Users width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>10</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <DollarSign width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>$100 / mnth</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            {/* View All Groups Button */}
-            <TouchableOpacity style={styles.viewAllButton} onPress={handleViewAllGroups}>
-              <Text style={styles.viewAllText}>View all groups</Text>
-            </TouchableOpacity>
+            {groups.length > 0 && (
+              <TouchableOpacity style={styles.viewAllButton} onPress={handleViewAllGroups}>
+                <Text style={styles.viewAllText}>View all groups</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -205,92 +175,74 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 120, // Extra space for bottom navigation
+    paddingBottom: 100,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#ffffff',
   },
   headerTitle: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '400',
     color: '#000000',
   },
   notificationContainer: {
-    position: 'relative',
-  },
-  notificationButton: {
-    padding: 4,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 20,
-    height: 20,
-    backgroundColor: '#ef4444',
-    borderRadius: 10,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  badgeText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
+  notificationButton: {
+    position: 'relative',
   },
   content: {
+    flex: 1,
     paddingHorizontal: 20,
   },
-  statsContainer: {
+  statsRow: {
     flexDirection: 'row',
     gap: 16,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
+    backgroundColor: '#F2F2F2',
+    borderRadius: 16,
     padding: 16,
-    position: 'relative',
-    height: 200,
     justifyContent: 'space-between',
+    minHeight: 122,
   },
-  statDescription: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 8,
-    lineHeight: 20,
+  statTop: {
+    color: '#928F8B',
+    fontSize: 12,
+    fontWeight: '400',
   },
-  statNumber: {
-    fontSize: 72,
-    fontWeight: 'bold',
-    color: '#000000',
-    textAlign: 'right',
-    lineHeight: 72,
+  statValue: {
+    color: '#1E1E1E',
+    fontSize: 64,
+    fontWeight: '500',
+    alignSelf: 'flex-end',
   },
   createGroupButton: {
     backgroundColor: '#000000',
     borderRadius: 12,
-    padding: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
   },
   createGroupTitle: {
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 4,
+    fontWeight: '500',
   },
   createGroupDescription: {
-    fontSize: 14,
-    color: '#d1d5db',
+    color: '#D1D5DB',
+    fontSize: 12,
+    marginTop: 4,
   },
   groupsSection: {
     marginTop: 8,
@@ -299,117 +251,75 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#000000',
-    marginBottom: 8,
   },
   groupsDescription: {
     fontSize: 12,
-    color: '#928F8B',
-    marginBottom: 16,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 12,
   },
   groupItem: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 10,
+    padding: 16,
+    borderColor: '#E5E7EB',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    marginBottom: 12,
   },
   groupContent: {
     flexDirection: 'row',
-    gap: 16,
   },
   groupIcon: {
-    width: 80,
-    height: 80,
+    width: 48,
+    height: 48,
     borderRadius: 8,
-    overflow: 'hidden',
-    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    marginRight: 12,
     alignItems: 'center',
-    position: 'relative',
+    justifyContent: 'center',
   },
   groupIconBg: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#e0f2e9',
-    borderRadius: 8,
-    position: 'relative',
-    // Map-like background styling
-    borderWidth: 0.5,
-    borderColor: '#c2d6b8',
-  },
-  iconBadge: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginTop: -15,
-    marginLeft: -15,
-    width: 30,
-    height: 30,
-    backgroundColor: '#e7c08c',
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  iconBadgeText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: '#DBEAFE',
   },
   groupInfo: {
     flex: 1,
-    flexDirection: "column",
-    alignItems: "stretch",
-    justifyContent: "space-between",
-    paddingVertical: 10
   },
   groupTitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#000000',
-    marginBottom: 4,
-  },
-  groupAmount: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#9A9A9A',
-    marginBottom: 12,
+    color: '#111827',
+  },
+  groupAmount: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
   },
   groupMeta: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
+    marginTop: 8,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    marginRight: 12,
   },
   metaText: {
     fontSize: 12,
-    color: '#4D4845',
-    fontWeight: "400"
+    color: '#2563eb',
+    marginLeft: 4,
   },
   viewAllButton: {
-    width: '80%',
     alignSelf: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 20,
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 16,
+    marginTop: 8,
   },
   viewAllText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
+    color: '#2563eb',
   },
 });

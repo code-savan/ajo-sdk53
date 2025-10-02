@@ -10,11 +10,11 @@ export default function WelcomeScreen() {
   const navigation = useNavigation<WelcomeScreenNavigationProp>();
 
   const handleCreateAccount = () => {
-    navigation.navigate('Signup');
+    navigation.navigate('Register' as any);
   };
 
   const handleLogin = () => {
-    navigation.navigate('Login');
+    navigation.navigate('Login' as any);
   };
 
   return (

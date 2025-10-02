@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "scheme": "ajo",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -17,7 +18,8 @@
       "bundleIdentifier": "com.codesavan.ajo",
       "buildNumber": "2",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication and to protect your account."
       }
     },
     "android": {
@@ -25,7 +27,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.codesavan.ajo"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,6 +38,22 @@
         "projectId": "3ff39fca-24d1-4af6-9c0f-970a8d5a6335"
       }
     },
-    "owner": "codesavan"
+    "owner": "codesavan",
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "This app uses Face ID for secure authentication and to protect your account."
+        }
+      ]
+    ],
+    "linking": {
+      "scheme": "ajo",
+      "prefixes": [
+        "ajo://",
+        "https://ajo.app"
+      ]
+    }
   }
 }

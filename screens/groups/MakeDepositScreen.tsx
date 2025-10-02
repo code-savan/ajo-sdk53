@@ -12,15 +12,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, X } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import Modal from 'react-native-modal';
+import { apiPost } from '../../lib/api';
+
+type RouteP = RouteProp<RootStackParamList, 'MakeDeposit'>;
 
 export default function MakeDepositScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteP>();
+  const groupId = (route.params as any)?.groupId as string | undefined;
+  const groupName = (route.params as any)?.groupName as string | undefined;
+
   const [amount, setAmount] = useState('$100');
   const [isModalVisible, setModalVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -34,12 +43,25 @@ export default function MakeDepositScreen() {
     setModalVisible(false);
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
+    if (!groupId) {
+      setError('Missing group');
+      setModalVisible(false);
+      return;
+    }
+    try {
+      setSubmitting(true);
+      setError(null);
+      const cents = Math.round(parseFloat(amount.replace('$', '')) * 100);
+      const data = await apiPost(`/api/groups/${groupId}/funding-intent`, { amount_cents: cents });
+      setModalVisible(false);
+      navigation.navigate('BankTransferDetails', { instructions: data.funding_instructions, payment_intent_id: data.payment_intent_id, amount_cents: cents });
+    } catch (e: any) {
+      setError('Failed to create funding instructions');
     setModalVisible(false);
-    navigation.navigate('GroupFunded', {
-      amount: amount,
-      groupName: 'Hawaii Vacation'
-    });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -54,7 +76,6 @@ export default function MakeDepositScreen() {
             <ArrowLeft width={24} height={24} color="#000000" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Fund Group</Text>
-          {/* <View style={styles.headerSpacer} /> */}
         </View>
 
         <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
@@ -63,20 +84,20 @@ export default function MakeDepositScreen() {
             <Text style={styles.subtitle}>
               Contribute now to avoid delays and maintain your group trust score.
             </Text>
+            {error ? <Text style={{ color: '#ef4444', marginTop: 8 }}>{error}</Text> : null}
           </View>
 
           <View style={styles.inputSection}>
             <Text style={styles.inputLabel}>Select group</Text>
             <View style={styles.inputContainer}>
-              <Text style={styles.input}>Hawaii Vacation</Text>
-              <Text style={styles.inputNote}>Next payment date: 1/07/2025</Text>
+              <Text style={styles.input}>{groupName || 'Select a group'}</Text>
             </View>
           </View>
 
           <View style={styles.inputSection}>
             <Text style={styles.inputLabel}>Payment method</Text>
             <View style={styles.inputContainer}>
-              <Text style={styles.input}>Wallet</Text>
+              <Text style={styles.input}>Bank transfer</Text>
             </View>
           </View>
 
@@ -95,8 +116,8 @@ export default function MakeDepositScreen() {
         </ScrollView>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.proceedButton} onPress={handleProceed}>
-            <Text style={styles.proceedButtonText}>Proceed</Text>
+          <TouchableOpacity style={[styles.proceedButton, submitting && { opacity: 0.6 }]} onPress={handleProceed} disabled={submitting}>
+            <Text style={styles.proceedButtonText}>{submitting ? 'Processing...' : 'Proceed'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -120,7 +141,7 @@ export default function MakeDepositScreen() {
             <View style={styles.sheetBody}>
               <View style={styles.sheetRow}>
                 <Text style={styles.sheetLabel}>Group name</Text>
-                <Text style={styles.sheetValue}>Hawaii Vacation</Text>
+                <Text style={styles.sheetValue}>{groupName || '-'}</Text>
               </View>
               <View style={styles.sheetRow}>
                 <Text style={styles.sheetLabel}>Contribution amount</Text>
@@ -128,7 +149,7 @@ export default function MakeDepositScreen() {
               </View>
               <View style={styles.sheetRow}>
                 <Text style={styles.sheetLabel}>Payment method</Text>
-                <Text style={styles.sheetValue}>Wallet</Text>
+                <Text style={styles.sheetValue}>Bank transfer</Text>
               </View>
               <View style={styles.sheetDivider} />
               <View style={styles.sheetRow}>

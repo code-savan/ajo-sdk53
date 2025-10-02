@@ -1,34 +1,111 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { Button } from '../../components/ui/button';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { useLoading } from '../../contexts/LoadingContext';
+import { ArrowLeft } from 'lucide-react-native';
+import { supabase } from '../../lib/supabase';
 
 type VerifyEmailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'VerifyEmail'>;
 
+type RouteParams = {
+  contactInfo: string;
+  verificationType: 'email' | 'phone';
+  fullName?: string;
+  password?: string;
+  isSignupFlow?: boolean; // Flag to ensure this is only used during signup
+};
+
 export default function VerifyEmailScreen() {
   const navigation = useNavigation<VerifyEmailScreenNavigationProp>();
-  
+  const route = useRoute();
+  const { verifyOTP } = useAuth();
+  const { showLoading, hideLoading } = useLoading();
+
+  // Get route parameters
+  const params = route.params as RouteParams || {};
+  const { contactInfo, verificationType = 'email', fullName, password, isSignupFlow = true } = params; // Default to true
+
+  // Log parameters for debugging
+  useEffect(() => {
+    console.log('VerifyEmailScreen loaded with params:', {
+      contactInfo,
+      isSignupFlow,
+      fullName: !!fullName,
+      password: !!password,
+      verificationType,
+      rawParams: params
+    });
+  }, [contactInfo, isSignupFlow, fullName, password, verificationType, params]);
+
   // State management
   const [code, setCode] = useState<string[]>(['', '', '', '', '', '']);
   const [isResending, setIsResending] = useState(false);
-  const [resendTimer, setResendTimer] = useState(0);
+  const [resendTimer, setResendTimer] = useState(60); // Start with 60 seconds since OTP was just sent
   const [isVerifying, setIsVerifying] = useState(false);
   const [showError, setShowError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [verificationSuccess, setVerificationSuccess] = useState(false);
-  
+  const [waitingForOtp, setWaitingForOtp] = useState(true);
+
   // References to input fields
   const inputRefs = useRef<(TextInput | null)[]>([]);
-  
+
+  // Wait a moment for OTP to be sent
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setWaitingForOtp(false);
+    }, 2000); // 2 seconds should be enough for the OTP to be sent
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Debug function to test Supabase configuration
+  const debugSupabaseConfig = async () => {
+    try {
+      console.log('=== SUPABASE DEBUG INFO ===');
+      console.log('Contact Info:', contactInfo);
+      console.log('Verification Type:', verificationType);
+
+      // Test if we can get session info
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('Current Session:', session ? 'Exists' : 'None');
+      if (sessionError) console.log('Session Error:', sessionError);
+
+      // Test if we can get user info
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('Current User:', user ? user.email : 'None');
+      if (userError) console.log('User Error:', userError);
+
+      console.log('=== SUPABASE CONFIGURATION GUIDE ===');
+      console.log('To receive OTP CODES instead of MAGIC LINKS:');
+      console.log('1. Go to Supabase Dashboard > Authentication > Email Templates');
+      console.log('2. Edit the "Magic Link" template');
+      console.log('3. Replace {{ .ConfirmationURL }} with {{ .Token }}');
+      console.log('4. This will send a 6-digit code instead of a clickable link');
+      console.log('=== END DEBUG INFO ===');
+
+      Alert.alert(
+        'Debug Info',
+        'Check console for detailed Supabase configuration information.\n\nTo get OTP codes instead of magic links, you need to modify your email template in the Supabase dashboard.',
+        [{ text: 'OK' }]
+      );
+
+    } catch (error) {
+      console.error('Debug function error:', error);
+    }
+  };
+
   // Focus first input on mount
   useEffect(() => {
     setTimeout(() => {
       inputRefs.current[0]?.focus();
     }, 100);
   }, []);
-  
+
   // Timer for resend button
   useEffect(() => {
     if (resendTimer > 0) {
@@ -36,113 +113,191 @@ export default function VerifyEmailScreen() {
       return () => clearTimeout(timer);
     }
   }, [resendTimer]);
-  
+
   // Handle input changes for code digits
   const handleInputChange = (index: number, value: string) => {
     if (value.length > 1) return; // Prevent multiple characters
-    
+
     // Reset error state if user types
     if (showError) {
       setShowError(false);
+      setErrorMessage('');
     }
-    
+
     const newCode = [...code];
     newCode[index] = value;
     setCode(newCode);
-    
+
     // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
-    
+
     // Auto-verify when all fields are filled
     if (newCode.every(digit => digit !== '') && value) {
       handleVerify(newCode.join(''));
     }
   };
-  
+
   // Handle backspace key press
   const handleKeyPress = (index: number, e: any) => {
     if (e.nativeEvent.key === 'Backspace' && !code[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
-  
-  // Verify code
+
+  // Verify code with Supabase
   const handleVerify = async (verificationCode: string) => {
+    console.log('Starting verification for:', verificationType, 'with code:', verificationCode);
+
     setIsVerifying(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsVerifying(false);
-    
-    // For demo purposes: 172369 is correct code
-    if (verificationCode === '172369') {
+    showLoading('Verifying your code...');
+    setShowError(false);
+    setErrorMessage('');
+
+    try {
+      // Use Supabase OTP verification
+      await verifyOTP(contactInfo, verificationCode, 'signup');
+
+      console.log('OTP verification successful');
       setVerificationSuccess(true);
-    } else {
+      hideLoading();
+
+    } catch (err: any) {
+      console.error('Verification error:', err);
+      hideLoading();
+
+      const errorMsg = err.message || 'Invalid verification code';
       setShowError(true);
-      // Clear code after error
-      setCode(['', '', '', '', '', '']);
-      // Refocus first input
-      setTimeout(() => {
-        inputRefs.current[0]?.focus();
-      }, 100);
+      setErrorMessage(errorMsg);
+      clearCodeInputs();
+    } finally {
+      setIsVerifying(false);
     }
   };
-  
-  // Resend code
+
+  // Helper function to clear code inputs
+  const clearCodeInputs = () => {
+    setCode(['', '', '', '', '', '']);
+    setTimeout(() => {
+      inputRefs.current[0]?.focus();
+    }, 100);
+  };
+
+  // Resend code with Supabase
   const handleResendCode = async () => {
     setIsResending(true);
-    setResendTimer(50); // 50-second cooldown
+    setResendTimer(60); // 60-second cooldown
     setShowError(false);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    setIsResending(false);
-    setCode(['', '', '', '', '', '']);
-    inputRefs.current[0]?.focus();
+    setErrorMessage('');
+
+    try {
+      // Resend OTP using Supabase (for signup, we use signInWithOtp)
+      console.log('Resending OTP to:', contactInfo);
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email: contactInfo.toLowerCase().trim(),
+        options: {
+          shouldCreateUser: false, // Don't create user yet
+        }
+      });
+
+      if (error && !error.message?.includes('User not found')) {
+        throw error;
+      }
+
+      Alert.alert(
+        'Code Sent',
+        `A new verification code has been sent to your ${verificationType === 'email' ? 'email' : 'phone number'}.`
+      );
+
+    } catch (err: any) {
+      console.error('Resend error:', err);
+
+      // Show more specific error messages
+      let errorMsg = 'Failed to resend verification code. ';
+      if (err.message?.includes('Email not confirmed')) {
+        errorMsg += 'Please check if your email address is valid.';
+      } else if (err.message?.includes('rate limit')) {
+        errorMsg += 'Too many requests. Please wait a moment before trying again.';
+      } else if (err.message?.includes('Invalid email')) {
+        errorMsg += 'The email address appears to be invalid.';
+      } else {
+        errorMsg += err.message || 'Please check your internet connection and try again.';
+      }
+
+      Alert.alert('Error', errorMsg);
+
+      // Reset timer on error so user can try again sooner
+      setResendTimer(0);
+    } finally {
+      setIsResending(false);
+      clearCodeInputs();
+    }
   };
-  
+
   // Handle main button press
-  const handleProceed = () => {
-    navigation.navigate('MainTabs');
+  const handleProceed = async () => {
+    console.log('handleProceed: Navigating to SetPin');
+
+    showLoading('Setting up your account...');
+
+    // Use reset navigation to prevent going back
+    navigation.reset({
+      index: 0,
+      routes: [{
+        name: 'SetPin',
+        params: {
+          fullName,
+          password
+        }
+      }],
+    });
+
+    // Hide loading after navigation
+    setTimeout(() => {
+      hideLoading();
+    }, 500);
   };
-  
+
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           {/* Back Button */}
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backButtonText}>←</Text>
+            <ArrowLeft size={24} color="#000000" />
           </TouchableOpacity>
-          
+
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Enter the 6 digit code we emailed you.</Text>
+            <Text style={styles.title}>
+              Enter the 6 digit code we {verificationType === 'email' ? 'emailed' : 'sent to'} you.
+            </Text>
             <Text style={styles.description}>
-              A code has been sent to your <Text style={styles.email}>johndoe@gmail.com</Text>. 
-              Please remember to check your inbox as well as your spam folder.
+              {waitingForOtp ? 'Sending verification code to' : 'A code has been sent to your'} <Text style={styles.email}>{contactInfo}</Text>.
+              {verificationType === 'email' && !waitingForOtp &&
+                ' Please remember to check your inbox as well as your spam folder.'
+              }
             </Text>
           </View>
-          
+
           {/* Success state */}
           {verificationSuccess ? (
             <View style={styles.successContainer}>
               <Text style={styles.successTitle}>Your verification was successful.</Text>
               <Text style={styles.successMessage}>
-                You're all set to start your AJO journey. Let's proceed to get your info.
+                You're all set to start your AJO journey. Let's set up your secure 4-digit PIN.
               </Text>
-              <Button 
-                title="Proceed" 
+              <TouchableOpacity
                 onPress={handleProceed}
                 style={styles.proceedButton}
-              />
+              >
+                <Text style={styles.proceedButtonText}>Continue to PIN Setup</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <>
@@ -152,7 +307,7 @@ export default function VerifyEmailScreen() {
                   {code.map((digit, index) => (
                     <TextInput
                       key={index}
-                      ref={el => inputRefs.current[index] = el}
+                      ref={(el) => { inputRefs.current[index] = el; }}
                       style={[
                         styles.codeInput,
                         digit && styles.codeInputFilled,
@@ -167,22 +322,24 @@ export default function VerifyEmailScreen() {
                     />
                   ))}
                 </View>
-                
+
                 {/* Error message */}
                 {showError && (
                   <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>Incorrect code inputed.</Text>
+                    <Text style={styles.errorText}>
+                      {errorMessage || 'Incorrect code entered.'}
+                    </Text>
                   </View>
                 )}
               </View>
-              
+
               {/* Resend code */}
               <View style={styles.resendContainer}>
                 <Text style={styles.resendLabel}>Didn't get a code? </Text>
                 {resendTimer > 0 ? (
                   <Text style={styles.timerText}>{`${resendTimer < 10 ? '0' : ''}${Math.floor(resendTimer / 60)}:${resendTimer % 60 < 10 ? '0' : ''}${resendTimer % 60}`}</Text>
                 ) : (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     onPress={handleResendCode}
                     disabled={isResending || resendTimer > 0}
                   >
@@ -190,9 +347,18 @@ export default function VerifyEmailScreen() {
                   </TouchableOpacity>
                 )}
               </View>
+
+              {/* Debug button - only show in development */}
+              {__DEV__ && (
+                <View style={styles.debugContainer}>
+                  <TouchableOpacity onPress={debugSupabaseConfig} style={styles.debugButton}>
+                    <Text style={styles.debugButtonText}>Debug Supabase Config</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </>
           )}
-          
+
           {/* Bottom notice */}
           {!verificationSuccess && (
             <View style={styles.noticeContainer}>
@@ -201,8 +367,8 @@ export default function VerifyEmailScreen() {
                   <Text style={styles.noticeIconText}>✉</Text>
                 </View>
                 <Text style={styles.noticeText}>
-                  If you are having any issues, remember to check verify that the email address you
-                  sent across is correct.
+                  If you are having any issues, remember to verify that the {verificationType === 'email' ? 'email address' : 'phone number'} you
+                  provided is correct.
                 </Text>
               </View>
             </View>
@@ -359,5 +525,57 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 56,
     borderRadius: 12,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proceedButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  debugContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  debugButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  debugButtonText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+    marginTop: 10,
+  },
+  loadingSubtext: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 5,
   },
 });

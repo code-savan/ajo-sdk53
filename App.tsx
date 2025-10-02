@@ -1,27 +1,36 @@
 import React, { useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, LinkingOptions, createNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 // Import screens
 import SplashScreenComponent from './screens/splash/SplashScreen';
 import WelcomeScreen from './screens/welcome/WelcomeScreen';
-import SignupScreen from './screens/signup/SignupScreen';
 import LoginScreen from './screens/login/LoginScreen';
+import RegisterScreen from './screens/signup/SignupScreen';
 import VerifyEmailScreen from './screens/verify-email/VerifyEmailScreen';
+import SetPinScreen from './screens/onboarding/SetPinScreen';
 import MainScreen from './screens/main/MainScreen';
 import GroupsScreen from './screens/groups/GroupsScreen';
+import WalletScreen from './screens/wallet/WalletScreen';
+import ProfileScreen from './screens/profile/ProfileScreen';
+
+// Import other screens as needed
 import AllGroupsScreen from './screens/groups/AllGroupsScreen';
 import GroupDetailScreen from './screens/groups/GroupDetailScreen';
 import AllMembersScreen from './screens/groups/AllMembersScreen';
 import MakeDepositScreen from './screens/groups/MakeDepositScreen';
 import GroupFundedScreen from './screens/groups/GroupFundedScreen';
+import CreateGroupScreen from './screens/groups/CreateGroupScreen';
+import GroupCreatedScreen from './screens/groups/GroupCreatedScreen';
 import RecentActivitiesScreen from './screens/activities/RecentActivitiesScreen';
 import ActivityDetailScreen from './screens/activities/ActivityDetailScreen';
 import NotificationsScreen from './screens/notifications/NotificationsScreen';
-import WalletScreen from './screens/wallet/WalletScreen';
 import FundWalletScreen from './screens/wallet/FundWalletScreen';
 import WithdrawFundsScreen from './screens/wallet/WithdrawFundsScreen';
 import BankTransferDetailsScreen from './screens/wallet/BankTransferDetailsScreen';
@@ -29,7 +38,6 @@ import CardPaymentScreen from './screens/wallet/CardPaymentScreen';
 import WalletFundedScreen from './screens/wallet/WalletFundedScreen';
 import TransactionsScreen from './screens/wallet/TransactionsScreen';
 import WalletAndPaymentScreen from './screens/profile/WalletAndPaymentScreen';
-import ProfileScreen from './screens/profile/ProfileScreen';
 import AccountInfoScreen from './screens/profile/AccountInfoScreen';
 import SecurityScreen from './screens/profile/SecurityScreen';
 import NotificationSettingsScreen from './screens/profile/NotificationSettingsScreen';
@@ -38,22 +46,44 @@ import PrivacyPolicyScreen from './screens/profile/PrivacyPolicyScreen';
 import TermsConditionsScreen from './screens/profile/TermsConditionsScreen';
 import ChangePinScreen from './screens/profile/ChangePinScreen';
 import TwoFactorAuthScreen from './screens/profile/TwoFactorAuthScreen';
-import CreateGroupScreen from './screens/groups/CreateGroupScreen';
-import GroupCreatedScreen from './screens/groups/GroupCreatedScreen';
+import VerifyAccountScreen from './screens/profile/VerifyAccountScreen';
+import NotificationDetailScreen from './screens/notifications/NotificationDetailScreen';
 
-// Import navigation types
+// Import contexts
+import { SupabaseAuthProvider, useAuth } from './contexts/SupabaseAuthContext';
+import { LoadingProvider } from './contexts/LoadingContext';
+import { supabase } from './lib/supabase';
+import { apiGet } from './lib/api';
+import { ToastProvider } from './contexts/ToastContext';
+
+// Navigation types
 export type RootStackParamList = {
   Splash: undefined;
   Welcome: undefined;
-  Signup: undefined;
   Login: undefined;
-  VerifyEmail: undefined;
+  Register: undefined;
+  VerifyEmail: {
+    contactInfo: string;
+    verificationType: 'email' | 'phone';
+    fullName?: string;
+    password?: string;
+    isSignupFlow?: boolean;
+  };
+  SetPin: {
+    fullName?: string;
+    password?: string;
+  };
   MainTabs: { screen?: string };
   FundWallet: undefined;
   WithdrawFunds: undefined;
-  BankTransferDetails: undefined;
+  BankTransferDetails: {
+    payment_intent_id?: string;
+    instructions?: any;
+    amount_cents?: number;
+    currency?: string;
+  } | undefined;
   CardPayment: undefined;
-  WalletFunded: undefined;
+  WalletFunded: { payment_intent_id?: string; amount_cents?: number; currency?: string } | undefined;
   Transactions: undefined;
   Wallet: undefined;
   WalletAndPayment: undefined;
@@ -64,7 +94,14 @@ export type RootStackParamList = {
   RecentActivities: undefined;
   ActivityDetail: { activity: { person: string; type: string; amount: string; } };
   Notifications: undefined;
-  GroupDetail: { groupName: string; groupId: string };
+  GroupDetail: {
+    groupName: string;
+    groupId: string;
+    amount?: string;
+    memberCount?: number;
+    monthlyContribution?: string;
+    date?: string;
+  };
   MakeDeposit: undefined;
   GroupFunded: { amount?: string; groupName?: string };
   NotificationSettings: undefined;
@@ -75,6 +112,8 @@ export type RootStackParamList = {
   TermsConditions: undefined;
   ChangePin: undefined;
   TwoFactorAuth: undefined;
+  VerifyAccount: undefined;
+  NotificationDetail: { notification: { id: string; title: string; message: string; type: string; } };
 };
 
 export type MainTabParamList = {
@@ -86,104 +125,206 @@ export type MainTabParamList = {
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
-// Keep the splash screen visible while we fetch resources
+// Keep splash screen visible while loading
 SplashScreen.preventAutoHideAsync();
+
+// Configure deep linking
+const linking = {
+  prefixes: [Linking.createURL('/'), 'ajo://'],
+  config: {
+    screens: {
+      Welcome: 'auth/callback',
+    },
+  },
+};
 
 function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { display: 'none' }, // Hide the built-in tab bar as we're using our custom component
+        tabBarStyle: { display: 'none' }, // Hide tab bar - using custom component
       }}
     >
-      <Tab.Screen
-        name="Home"
-        component={MainScreen}
-      />
-      <Tab.Screen
-        name="Groups"
-        component={GroupsScreen}
-      />
-      <Tab.Screen
-        name="Wallet"
-        component={WalletScreen}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-      />
+      <Tab.Screen name="Home" component={MainScreen} />
+      <Tab.Screen name="Groups" component={GroupsScreen} />
+      <Tab.Screen name="Wallet" component={WalletScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
 
-export default function App() {
+// Navigation component with authentication logic
+function AppNavigator() {
+  const { session, isLoading, isInSignupFlow } = useAuth();
   const [appIsReady, setAppIsReady] = useState(false);
+  const [hasPin, setHasPin] = useState<boolean | null>(null);
+  const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Splash');
+  const [hasSetInitialRoute, setHasSetInitialRoute] = useState(false);
+  const [pendingRoute, setPendingRoute] = useState<keyof RootStackParamList | null>(null);
+  const [mustVerify, setMustVerify] = useState(false);
 
+  // Initialize app (show splash ~3s, then decide route)
   useEffect(() => {
-    async function prepare() {
+    const timer = setTimeout(async () => {
       try {
-        // App initialization without fonts for now
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (e) {
-        console.warn(e);
-      } finally {
+        // Decide: if user has any stored session/token, go to Login, else Welcome
+        let goTo: keyof RootStackParamList = 'Welcome';
+        try {
+          const { data } = await supabase.auth.getSession();
+          const storedAny = await AsyncStorage.getItem('sb-cpvgznbnczuqzmyvaxdo-auth-token');
+          if (data?.session?.access_token || storedAny) {
+            goTo = 'Login';
+          }
+        } catch {}
+        setPendingRoute(goTo);
         setAppIsReady(true);
+      } finally {
+        // Hide splash after deciding route; actual navigation happens on onReady
         await SplashScreen.hideAsync();
       }
-    }
-
-    prepare();
+    }, 3000);
+    return () => clearTimeout(timer);
   }, []);
 
-  if (!appIsReady) {
-    return null;
-  }
+  // Check if user has PIN when session exists (kept for future flows)
+  useEffect(() => {
+    const checkUserPin = async () => {
+      if (session?.user?.id) {
+        try {
+          const { data } = await supabase
+            .from('users')
+            .select('pin_hash')
+            .eq('id', session.user.id)
+            .single();
+          setHasPin(!!data?.pin_hash);
+        } catch (error) {
+          setHasPin(false);
+        }
+      } else {
+        setHasPin(null);
+      }
+    };
+    checkUserPin();
+  }, [session]);
+
+  // Fetch verification status when session changes
+  useEffect(() => {
+    const load = async () => {
+      try {
+        if (session?.user?.id) {
+          const profile = await apiGet('/api/users/profile');
+          setMustVerify(!profile?.is_verified);
+        } else {
+          setMustVerify(false);
+        }
+      } catch {
+        setMustVerify(false);
+      }
+    };
+    load();
+  }, [session]);
+
+  // Redirect to Login on sign-out
+  useEffect(() => {
+    if (!navigationRef.isReady()) return;
+    const current = navigationRef.getCurrentRoute()?.name as keyof RootStackParamList | undefined;
+    if (!session?.user && current !== 'Login') {
+      navigationRef.reset({ index: 0, routes: [{ name: 'Login' }] });
+    }
+  }, [session]);
+
+  // Redirect based on verification status once navigation is ready
+  useEffect(() => {
+    if (!navigationRef.isReady()) return;
+    const current = navigationRef.getCurrentRoute()?.name as keyof RootStackParamList | undefined;
+    if (mustVerify && current !== 'VerifyAccount') {
+      navigationRef.reset({ index: 0, routes: [{ name: 'VerifyAccount' }] });
+    } else if (!mustVerify && current === 'VerifyAccount') {
+      navigationRef.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+    }
+  }, [mustVerify]);
+
+  // Determine initial route (fallback, not strictly needed after pendingRoute)
+  const determineInitialRoute = (): keyof RootStackParamList => {
+    return 'Welcome';
+  };
+
+  // Don't return null for auth loading to avoid blank screen
 
   return (
+    <NavigationContainer
+      ref={navigationRef}
+      linking={linking}
+      onReady={() => {
+        if (pendingRoute && navigationRef.isReady()) {
+          navigationRef.reset({ index: 0, routes: [{ name: pendingRoute }] });
+          setPendingRoute(null);
+        }
+      }}
+    >
+      <StatusBar style="dark" />
+      <Stack.Navigator
+        initialRouteName={initialRoute}
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        {/* Auth screens */}
+        <Stack.Screen name="Splash" component={SplashScreenComponent} />
+        <Stack.Screen name="Welcome" component={WelcomeScreen} />
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+        <Stack.Screen name="SetPin" component={SetPinScreen} />
+        <Stack.Screen name="VerifyAccount" component={VerifyAccountScreen} />
+        {/* Main app */}
+        <Stack.Screen name="MainTabs" component={MainTabs} />
+        {/* Other screens */}
+        <Stack.Screen name="FundWallet" component={FundWalletScreen} />
+        <Stack.Screen name="WithdrawFunds" component={WithdrawFundsScreen} />
+        <Stack.Screen name="BankTransferDetails" component={BankTransferDetailsScreen} />
+        <Stack.Screen name="CardPayment" component={CardPaymentScreen} />
+        <Stack.Screen name="WalletFunded" component={WalletFundedScreen} />
+        <Stack.Screen name="Transactions" component={TransactionsScreen} />
+        <Stack.Screen name="Wallet" component={WalletScreen} />
+        <Stack.Screen name="WalletAndPayment" component={WalletAndPaymentScreen} />
+        <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
+        <Stack.Screen name="GroupCreated" component={GroupCreatedScreen} />
+        <Stack.Screen name="AllGroups" component={AllGroupsScreen} />
+        <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
+        <Stack.Screen name="AllMembers" component={AllMembersScreen} />
+        <Stack.Screen name="MakeDeposit" component={MakeDepositScreen} />
+        <Stack.Screen name="GroupFunded" component={GroupFundedScreen} />
+        <Stack.Screen name="RecentActivities" component={RecentActivitiesScreen} />
+        <Stack.Screen name="ActivityDetail" component={ActivityDetailScreen} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="NotificationDetail" component={NotificationDetailScreen} />
+        <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+        <Stack.Screen name="AccountInfo" component={AccountInfoScreen} />
+        <Stack.Screen name="Security" component={SecurityScreen} />
+        <Stack.Screen name="SupportHelp" component={SupportHelpScreen} />
+        <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+        <Stack.Screen name="TermsConditions" component={TermsConditionsScreen} />
+        <Stack.Screen name="ChangePin" component={ChangePinScreen} />
+        <Stack.Screen name="TwoFactorAuth" component={TwoFactorAuthScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <StatusBar style="dark" />
-        <Stack.Navigator
-          initialRouteName="Splash"
-          screenOptions={{
-            headerShown: false,
-          }}
-        >
-          <Stack.Screen name="Splash" component={SplashScreenComponent} />
-          <Stack.Screen name="Welcome" component={WelcomeScreen} />
-          <Stack.Screen name="Signup" component={SignupScreen} />
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
-          <Stack.Screen name="MainTabs" component={MainTabs} />
-          <Stack.Screen name="FundWallet" component={FundWalletScreen} />
-          <Stack.Screen name="WithdrawFunds" component={WithdrawFundsScreen} />
-          <Stack.Screen name="BankTransferDetails" component={BankTransferDetailsScreen} />
-          <Stack.Screen name="CardPayment" component={CardPaymentScreen} />
-          <Stack.Screen name="WalletFunded" component={WalletFundedScreen} />
-          <Stack.Screen name="Transactions" component={TransactionsScreen} />
-          <Stack.Screen name="WalletAndPayment" component={WalletAndPaymentScreen} />
-          <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
-          <Stack.Screen name="GroupCreated" component={GroupCreatedScreen} />
-          <Stack.Screen name="AllGroups" component={AllGroupsScreen} />
-          <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
-          <Stack.Screen name="AllMembers" component={AllMembersScreen} />
-          <Stack.Screen name="MakeDeposit" component={MakeDepositScreen} />
-          <Stack.Screen name="GroupFunded" component={GroupFundedScreen} />
-          <Stack.Screen name="RecentActivities" component={RecentActivitiesScreen} />
-          <Stack.Screen name="ActivityDetail" component={ActivityDetailScreen} />
-          <Stack.Screen name="Notifications" component={NotificationsScreen} />
-          <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-          <Stack.Screen name="AccountInfo" component={AccountInfoScreen} />
-          <Stack.Screen name="Security" component={SecurityScreen} />
-          <Stack.Screen name="SupportHelp" component={SupportHelpScreen} />
-          <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
-          <Stack.Screen name="TermsConditions" component={TermsConditionsScreen} />
-          <Stack.Screen name="ChangePin" component={ChangePinScreen} />
-          <Stack.Screen name="TwoFactorAuth" component={TwoFactorAuthScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <SupabaseAuthProvider>
+        <LoadingProvider>
+          <ToastProvider>
+            <AppNavigator />
+          </ToastProvider>
+        </LoadingProvider>
+      </SupabaseAuthProvider>
     </SafeAreaProvider>
   );
 }

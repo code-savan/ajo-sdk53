@@ -1,105 +1,83 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabase } from '@/lib/supabase';
-import { verifyAccessToken } from '@/utils/jwt';
-import { ApiResponse, Group, CreateGroupRequest } from '@/types/database';
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { supabaseAdmin as supabase } from '@/lib/supabase'
+import { verifyAccessToken } from '@/utils/jwt'
 
-const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse<Group | Group[]>>) => {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // Verify authentication
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, error: 'No token provided' });
+      return res.status(401).json({ success: false, error: 'No token provided' })
+    }
+    const token = authHeader.split(' ')[1]
+    const payload = verifyAccessToken(token)
+
+    if (req.method === 'GET') {
+      const { data: memberships, error: memErr } = await supabase
+          .from('group_members')
+        .select('group_id, groups:group_id(*)')
+        .eq('user_id', (payload as any).userId)
+
+      if (memErr) {
+        return res.status(400).json({ success: false, error: memErr.message })
+        }
+
+      const groups = (memberships || []).map((m: any) => m.groups)
+      return res.json({ success: true, data: groups })
     }
 
-    const token = authHeader.split(' ')[1];
-    const payload = verifyAccessToken(token);
+    if (req.method === 'POST') {
+      const {
+        name,
+        description,
+        size,
+        contribution_amount_cents,
+        currency = process.env.STRIPE_DEFAULT_CURRENCY || 'usd',
+        frequency,
+        goal_amount_cents,
+        payout_order_strategy = 'random_fixed'
+      } = req.body || {}
 
-    switch (req.method) {
-      case 'GET':
-        // Get user's groups
-        const { data: userGroups, error: getGroupsError } = await supabase
-          .from('group_members')
-          .select(`
-            *,
-            groups:group_id (*)
-          `)
-          .eq('user_id', payload.userId)
-          .eq('status', 'active');
-
-        if (getGroupsError) {
-          return res.status(400).json({ success: false, error: getGroupsError.message });
+      if (!name || !size || !contribution_amount_cents || !frequency || !goal_amount_cents) {
+        return res.status(400).json({ success: false, error: 'Missing required fields' })
         }
 
-        const groups = userGroups.map(member => member.groups);
-        return res.json({ success: true, data: groups });
-
-      case 'POST':
-        // Create new group
-        const { name, description, contribution_amount, frequency, start_date, max_members } = req.body as CreateGroupRequest;
-
-        if (!name || !contribution_amount || !frequency || !start_date) {
-          return res.status(400).json({ success: false, error: 'Missing required fields' });
-        }
-
-        // Create group
-        const { data: newGroup, error: createGroupError } = await supabase
+      const { data: group, error } = await supabase
           .from('groups')
           .insert({
             name,
             description,
-            admin_id: payload.userId,
-            contribution_amount,
+          creator_user_id: (payload as any).userId,
+          size,
+          contribution_amount_cents,
+          currency,
             frequency,
-            start_date,
-            max_members: max_members || 10,
-            status: 'pending',
-            current_round: 1,
-            total_rounds: max_members || 10
+          goal_amount_cents,
+          status: 'draft',
+          payout_order_strategy
           })
-          .select()
-          .single();
+        .select('*')
+        .single()
 
-        if (createGroupError) {
-          return res.status(400).json({ success: false, error: createGroupError.message });
-        }
+      if (error || !group) {
+        return res.status(400).json({ success: false, error: error?.message || 'Failed to create group' })
+      }
 
-        // Add creator as first member and admin
-        const { error: addMemberError } = await supabase
+      const { error: addErr } = await supabase
           .from('group_members')
-          .insert({
-            group_id: newGroup.id,
-            user_id: payload.userId,
-            position: 1,
-            role: 'admin',
-            status: 'active',
-            total_contributed: 0,
-            has_received_payout: false
-          });
+        .insert({ group_id: group.id, user_id: (payload as any).userId, role: 'owner' })
 
-        if (addMemberError) {
-          // If adding member fails, we should clean up the group
-          await supabase.from('groups').delete().eq('id', newGroup.id);
-          return res.status(400).json({ success: false, error: 'Failed to add user to group' });
-        }
+      if (addErr) {
+        return res.status(400).json({ success: false, error: addErr.message })
+      }
 
-        // Create wallet for the group if needed
-        const { error: walletError } = await supabase
-          .from('wallets')
-          .insert({
-            user_id: payload.userId,
-            balance: 0,
-            pending_balance: 0
-          });
+      const duration_months = Math.ceil(Number(goal_amount_cents) / Number(contribution_amount_cents))
 
-        return res.status(201).json({ success: true, data: newGroup });
-
-      default:
-        res.setHeader('Allow', ['GET', 'POST']);
-        return res.status(405).end(`Method ${req.method} Not Allowed`);
+      return res.status(201).json({ success: true, data: { group, duration_months } })
     }
-  } catch (error: any) {
-    return res.status(401).json({ success: false, error: 'Invalid token' });
-  }
-};
 
-export default handler;
+    res.setHeader('Allow', ['GET', 'POST'])
+    return res.status(405).end(`Method ${req.method} Not Allowed`)
+  } catch (e: any) {
+    return res.status(401).json({ success: false, error: 'Invalid token' })
+  }
+}

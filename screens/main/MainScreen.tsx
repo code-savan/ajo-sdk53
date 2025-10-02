@@ -1,16 +1,60 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Calendar, Users, Plus, ChevronDown, ChevronUp, ChevronRight, DollarSign } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import BottomNavigation from '../../components/BottomNavigation';
+import { apiGet } from '../../lib/api';
 
 const avatarImageUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=1480";
 
 export default function MainScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState<string>('');
+  const [unread, setUnread] = useState<number>(0);
+  const [groups, setGroups] = useState<any[]>([]);
+  const [txns, setTxns] = useState<any[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [profile, notif, grp, txn] = await Promise.all([
+          apiGet('/api/users/profile').catch(()=>({})),
+          apiGet('/api/notifications?page=1&limit=1&unread_only=true').catch(()=>({ data: { total: 0 } })),
+          apiGet('/api/groups').catch(()=>[]),
+          apiGet('/api/me/transactions').catch(()=>[]),
+        ]);
+        setName(profile?.full_name || (profile?.email ? profile.email.split('@')[0] : ''));
+        const totalUnread = notif?.data?.total ?? notif?.total ?? 0;
+        setUnread(Number(totalUnread||0));
+        setGroups(Array.isArray(grp) ? grp : []);
+        setTxns(Array.isArray(txn) ? txn.slice(0,3) : []);
+      } finally {
+        setLoading(false);
+      }
+    };
+    const unsub = navigation.addListener('focus', load);
+    load();
+    return unsub;
+  }, [navigation]);
+
+  const expectedAmount = useMemo(() => {
+    // Sum of positive rotation earnings in the last period as sample; default 0
+    const credits = txns.filter(t=>t.source==='rotation_earning' && t.direction==='credit').reduce((s,t)=>s+Number(t.amount_cents||0),0);
+    return credits/100;
+  }, [txns]);
+
+  const nextPick = useMemo(() => {
+    const active = groups.find((g:any)=>g.status==='active' && g.next_charge_at);
+    return active?.next_charge_at ? new Date(active.next_charge_at).toLocaleDateString() : 'not set';
+  }, [groups]);
+
+  const groupCount = groups.length;
+  const showUpcoming = false; // hidden per requirement
 
   const handleCreateGroup = () => {
     navigation.navigate('CreateGroup');
@@ -35,7 +79,7 @@ export default function MainScreen() {
   };
 
   const handleGroupPress = (groupData: any) => {
-    navigation.navigate('GroupDetail', { 
+    navigation.navigate('GroupDetail', {
       groupName: groupData.name,
       groupId: groupData.id,
       amount: groupData.amount,
@@ -48,12 +92,14 @@ export default function MainScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
-          <Text style={styles.headerText}>Welcome, Dean.</Text>
+          <Text style={styles.headerText}>{`Welcome${name?`, ${name}.`:`.`}`}</Text>
           <TouchableOpacity onPress={handleNotificationsPress}>
             <Bell color="#111827" size={24} />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationText}>3</Text>
-            </View>
+            {unread > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationText}>{unread > 9 ? '9+' : String(unread)}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -67,40 +113,42 @@ export default function MainScreen() {
           <View style={styles.cardInfo}>
 
           <Text style={styles.expectedAmountLabel}>Expected Amount</Text>
-          <Text style={styles.expectedAmount}>$3,500.00</Text>
+          <Text style={styles.expectedAmount}>{(expectedAmount || 0).toLocaleString('en-US',{style:'currency',currency:'USD'})}</Text>
           </View>
           <View style={styles.cardBottom}>
           <View style={styles.divider} />
           <View style={styles.cardFooter}>
             <View style={styles.nextPickDate}>
               <Calendar color="#3358FF" size={16} />
-              <Text style={styles.nextPickDateText}>Next Pick: 1/07/2025</Text>
+              <Text style={styles.nextPickDateText}>Next Pick: {nextPick}</Text>
             </View>
             <View style={styles.groupImages}>
-              {[0, 1, 2].map((_, index) => (
-                <Image key={index} source={{uri: avatarImageUrl}} style={[styles.groupImage, { marginLeft: index > 0 ? -10 : 0 }]} />
+              {groupCount === 0 ? null : groups.slice(0,3).map((g:any, index:number) => (
+                <Image key={g.id} source={{uri: avatarImageUrl}} style={[styles.groupImage, { marginLeft: index > 0 ? -10 : 0 }]} />
               ))}
-              <Text style={styles.groupCount}>3 Groups</Text>
+              <Text style={styles.groupCount}>{groupCount === 0 ? 'no Groups' : `${Math.min(groupCount, 99)} Groups`}</Text>
             </View>
           </View>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Upcoming payment</Text>
-          <Text style={styles.sectionSubtitle}>Your next group payment is around the corner.</Text>
-          <View style={styles.paymentCard}>
-            <View>
-              <Text style={styles.paymentText}>Your next payment is</Text>
-              <Text style={styles.paymentDate}>1/07/2025</Text>
+        {showUpcoming ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Upcoming payment</Text>
+            <Text style={styles.sectionSubtitle}>Your next group payment is around the corner.</Text>
+            <View style={styles.paymentCard}>
+              <View>
+                <Text style={styles.paymentText}>Your next payment is</Text>
+                <Text style={styles.paymentDate}>1/07/2025</Text>
+              </View>
+              <Calendar color="#111827" size={24} />
             </View>
-            <Calendar color="#111827" size={24} />
           </View>
-        </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My groups</Text>
-          <Text style={styles.sectionSubtitle}>Stay in the loop. View all your groups.</Text>
+          <Text style={styles.sectionSubtitle}>{groupCount===0 ? 'No groups yet. Create your first group.' : 'Stay in the loop. View all your groups.'}</Text>
 
           {/* Create Group Button */}
           <TouchableOpacity style={styles.createGroupButton} onPress={handleCreateGroup}>
@@ -113,134 +161,54 @@ export default function MainScreen() {
 
           {/* Groups Section */}
           <View style={styles.groupsSection}>
-            {/* Hawaii Vacation Group */}
-            <TouchableOpacity 
-              style={styles.groupItem}
-              onPress={() => handleGroupPress({
-                name: 'Hawaii Vacation',
-                id: 'hawaii-vacation',
-                amount: '$1,500.00',
-                memberCount: 15,
-                monthlyContribution: '$100 / mnth',
-                date: '1/07/2025'
-              })}
-            >
-              <View style={styles.groupContent}>
-                <View style={styles.groupIcon}>
-                  {/* Simple map-like background with coin icon */}
-                  <View style={styles.groupIconBg}>
-                    <View style={styles.iconBadge}>
-                      <Text style={styles.iconBadgeText}>5</Text>
+            {groupCount === 0 ? null : groups.slice(0,3).map((g:any) => (
+              <TouchableOpacity
+                key={g.id}
+                style={styles.groupItem}
+                onPress={() => handleGroupPress({
+                  name: g.name,
+                  id: g.id,
+                  amount: (g.goal_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()}),
+                  memberCount: g.size,
+                  monthlyContribution: `${(g.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()})} / ${g.frequency}`,
+                  date: g.next_charge_at ? new Date(g.next_charge_at).toLocaleDateString() : '-'
+                })}
+              >
+                <View style={styles.groupContent}>
+                  <View style={styles.groupIcon}>
+                    <View style={styles.groupIconBg}>
+                      <View style={styles.iconBadge}>
+                        <Text style={styles.iconBadgeText}>{String(g.size)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.groupInfo}>
+                    <Text style={styles.groupTitle}>{g.name}</Text>
+                    <Text style={styles.groupAmount}>{(g.goal_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()})}</Text>
+                    <View style={styles.groupMeta}>
+                      <View style={styles.metaItem}>
+                        <Calendar width={16} height={16} color="#2563eb" />
+                        <Text style={styles.metaText}>{g.next_charge_at ? new Date(g.next_charge_at).toLocaleDateString() : '-'}</Text>
+                      </View>
+                      <View style={styles.metaItem}>
+                        <Users width={16} height={16} color="#2563eb" />
+                        <Text style={styles.metaText}>{g.size}</Text>
+                      </View>
+                      <View style={styles.metaItem}>
+                        <DollarSign width={16} height={16} color="#2563eb" />
+                        <Text style={styles.metaText}>{(g.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()})}</Text>
+                      </View>
                     </View>
                   </View>
                 </View>
-                <View style={styles.groupInfo}>
-                  <Text style={styles.groupTitle}>Hawaii Vacation</Text>
-                  <Text style={styles.groupAmount}>$1,500.00</Text>
-                  <View style={styles.groupMeta}>
-                    <View style={styles.metaItem}>
-                      <Calendar width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>1/07/2025</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Users width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>15</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <DollarSign width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>$100 / mnth</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
 
-            {/* Cooking Fees Group */}
-            <TouchableOpacity 
-              style={styles.groupItem}
-              onPress={() => handleGroupPress({
-                name: 'Cooking Fees',
-                id: 'cooking-fees',
-                amount: '$1,000.00',
-                memberCount: 10,
-                monthlyContribution: '$100 / mnth',
-                date: '1/07/2025'
-              })}
-            >
-              <View style={styles.groupContent}>
-                <View style={styles.groupIcon}>
-                  <View style={styles.groupIconBg}>
-                    <View style={styles.iconBadge}>
-                      <Text style={styles.iconBadgeText}>5</Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.groupInfo}>
-                  <Text style={styles.groupTitle}>Cooking Fees</Text>
-                  <Text style={styles.groupAmount}>$1,000.00</Text>
-                  <View style={styles.groupMeta}>
-                    <View style={styles.metaItem}>
-                      <Calendar width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>1/07/2025</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Users width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>10</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <DollarSign width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>$100 / mnth</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            {/* TV Prep Group */}
-            <TouchableOpacity 
-              style={styles.groupItem}
-              onPress={() => handleGroupPress({
-                name: 'TV Prep',
-                id: 'tv-prep',
-                amount: '$1,000.00',
-                memberCount: 10,
-                monthlyContribution: '$100 / mnth',
-                date: '1/07/2025'
-              })}
-            >
-              <View style={styles.groupContent}>
-                <View style={styles.groupIcon}>
-                  <View style={styles.groupIconBg}>
-                    <View style={styles.iconBadge}>
-                      <Text style={styles.iconBadgeText}>5</Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.groupInfo}>
-                  <Text style={styles.groupTitle}>TV Prep</Text>
-                  <Text style={styles.groupAmount}>$1,000.00</Text>
-                  <View style={styles.groupMeta}>
-                    <View style={styles.metaItem}>
-                      <Calendar width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>1/07/2025</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Users width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>10</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <DollarSign width={16} height={16} color="#2563eb" />
-                      <Text style={styles.metaText}>$100 / mnth</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            {/* View All Groups Button */}
-            <TouchableOpacity style={styles.viewAllGroupsButton} onPress={handleViewAllGroups}>
-              <Text style={styles.viewAllGroupsText}>View all groups</Text>
-            </TouchableOpacity>
+            {groupCount > 0 && (
+              <TouchableOpacity style={styles.viewAllGroupsButton} onPress={handleViewAllGroups}>
+                <Text style={styles.viewAllGroupsText}>View all groups</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -248,62 +216,44 @@ export default function MainScreen() {
           <Text style={styles.sectionTitle}>Recent activities</Text>
           <Text style={styles.sectionSubtitle}>Here are your recent activities across your group.</Text>
 
-          <TouchableOpacity
-            style={styles.transaction}
-            onPress={() => handleActivityPress('System', 'deposit', '100')}
-          >
-            <View style={styles.transactionIconContainer}>
-              <ChevronDown width={24} height={24} color="#4D4845" />
-            </View>
-            <View style={styles.transactionInfo}>
-              <View>
-                <Text style={styles.transactionName}>Deposit</Text>
-                <Text style={styles.transactionType}>Contribution</Text>
-              </View>
-              <View style={styles.transactionDetails}>
-                <Text style={styles.transactionAmount}>$100.0</Text>
-                <Text style={styles.transactionTime}>12:45pm</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.transaction}
-            onPress={() => handleActivityPress('Angus', 'collection', '1000')}
-          >
-            <View style={styles.transactionIconContainer}>
-              <ChevronUp width={24} height={24} color="#4D4845" />
-            </View>
-            <View style={styles.transactionInfo}>
-              <View>
-                <Text style={styles.transactionName}>Pickup</Text>
-                <Text style={styles.transactionType}>Contribution</Text>
-              </View>
-              <View style={styles.transactionDetails}>
-                <Text style={[styles.transactionAmount, styles.positive]}>$1000</Text>
-                <Text style={styles.transactionTime}>Yesterday</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.transaction}
-            onPress={() => handleActivityPress('System', 'withdrawal', '19.99')}
-          >
-            <View style={styles.transactionIconContainer}>
-              <ChevronDown width={24} height={24} color="#4D4845" />
-            </View>
-            <View style={styles.transactionInfo}>
-              <View>
-                <Text style={styles.transactionName}>Withdrawal</Text>
-                <Text style={styles.transactionType}>Wallet</Text>
-              </View>
-              <View style={styles.transactionDetails}>
-                <Text style={styles.transactionAmount}>$19.99</Text>
-                <Text style={styles.transactionTime}>Feb 11</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
+          {txns.length === 0 ? (
+            <Text style={{ color: '#6B7280' }}>No recent activities.</Text>
+          ) : txns.map((t:any, idx:number)=>{
+            const isPositive = t.direction === 'credit';
+            const amount = (Number(t.amount_cents)/100).toLocaleString('en-US',{ style: 'currency', currency: (t.currency||'USD').toUpperCase() });
+            const title = t.source === 'deposit' ? 'Deposit' : t.source === 'withdrawal' ? 'Withdrawal' : t.source === 'rotation_earning' ? 'Pickup' : t.source === 'contribution' ? 'Deposit' : t.source;
+            const subtitle = t.source === 'contribution' ? 'Contribution' : 'Wallet';
+            const dt = new Date(t.occurred_at);
+            const now = new Date();
+            const isToday = dt.toDateString() === now.toDateString();
+            const yesterday = new Date(now); yesterday.setDate(now.getDate()-1);
+            const rightTime = isToday ? dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : (dt.toDateString() === yesterday.toDateString() ? 'Yesterday' : dt.toLocaleDateString([], { month: 'short', day: 'numeric' }));
+            return (
+              <TouchableOpacity
+                key={t.id}
+                style={styles.transaction}
+                onPress={() => handleActivityPress('System', title.toLowerCase(), String(Number(t.amount_cents)/100))}
+              >
+                <View style={styles.transactionIconContainer}>
+                  {isPositive ? (
+                    <ChevronUp width={24} height={24} color="#4D4845" />
+                  ) : (
+                    <ChevronDown width={24} height={24} color="#4D4845" />
+                  )}
+                </View>
+                <View style={styles.transactionInfo}>
+                  <View>
+                    <Text style={styles.transactionName}>{title}</Text>
+                    <Text style={styles.transactionType}>{subtitle}</Text>
+                  </View>
+                  <View style={styles.transactionDetails}>
+                    <Text style={[styles.transactionAmount, isPositive ? styles.positive : undefined]}>{amount}</Text>
+                    <Text style={styles.transactionTime}>{rightTime}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
 
           <TouchableOpacity style={styles.viewAllButton} onPress={handleViewAllActivities}>
             <Text style={styles.viewAllText}>View all activities</Text>

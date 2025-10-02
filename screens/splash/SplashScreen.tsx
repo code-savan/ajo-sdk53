@@ -1,22 +1,43 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, ImageBackground } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../../lib/supabase';
 
 type SplashScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Splash'>;
 
 export default function SplashScreen() {
   const navigation = useNavigation<SplashScreenNavigationProp>();
+  const route = useRoute();
+  const { isInSignupFlow } = useAuth();
+  const [hasNavigated, setHasNavigated] = useState(false);
 
   useEffect(() => {
-    // Auto-navigate to welcome screen after 3 seconds
-    const timer = setTimeout(() => {
-      navigation.navigate('Welcome');
+    if (hasNavigated) return;
+
+    const timer = setTimeout(async () => {
+      if (hasNavigated) return;
+      try {
+        // Decide destination based on presence of any stored session/token
+        let goTo: keyof RootStackParamList = 'Welcome';
+        try {
+          const { data } = await supabase.auth.getSession();
+          const storedAny = await AsyncStorage.getItem('sb-cpvgznbnczuqzmyvaxdo-auth-token');
+          if (data?.session?.access_token || storedAny) {
+            goTo = 'Login';
+          }
+        } catch {}
+
+        setHasNavigated(true);
+        navigation.replace(goTo);
+      } catch {}
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [navigation]);
+  }, [navigation, hasNavigated]);
 
   return (
     <View style={styles.container}>

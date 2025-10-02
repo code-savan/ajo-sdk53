@@ -1,5 +1,51 @@
 # Changelog
 
+## Authentication Flow Fixes and OTP Verification Implementation (2025-09-22)
+
+Fixed critical authentication flow issues and implemented proper OTP email verification for the signup process:
+
+1. **Login Flow Bug Fixes**:
+   - **PIN Verification Logic**: Fixed issue where successful PIN verification was incorrectly prompting for password
+   - **User Session Handling**: Corrected logic to check if user is already authenticated before attempting new sign-in
+   - **Failed Attempts Tracking**: Enhanced database synchronization for PIN attempt tracking and reset functionality
+   - **Password Input Flow**: Fixed password input functionality when users are legitimately prompted to enter password
+   - **State Management**: Improved `requirePassword` state handling and reset logic
+
+2. **OTP Email Verification System**:
+   - **Automatic OTP Sending**: Implemented automatic OTP sending when VerifyEmailScreen loads
+   - **Magic Link to OTP Conversion**: Configured Supabase to send 6-digit OTP codes instead of magic links
+   - **Enhanced Error Handling**: Added specific error messages for common OTP issues (rate limiting, invalid email, etc.)
+   - **Loading States**: Added visual feedback during OTP sending with loading indicators
+   - **Resend Functionality**: Improved resend code functionality with better error handling and cooldown timers
+
+3. **Navigation Flow Protection**:
+   - **Signup Flow Restriction**: Ensured VerifyEmailScreen only appears during signup flow, not login
+   - **Route Parameter Validation**: Added `isSignupFlow` parameter to prevent inappropriate access to email verification
+   - **Login Flow Cleanup**: Removed email verification navigation from login flow, implementing proper password-based authentication
+   - **Navigation Types**: Updated TypeScript navigation types to support new flow restrictions
+
+4. **User Experience Enhancements**:
+   - **Debug Tools**: Added development-only debug buttons for testing and troubleshooting authentication issues
+   - **Console Logging**: Comprehensive logging for PIN verification, OTP sending, and authentication state changes
+   - **Better Error Messages**: More specific and user-friendly error messages for authentication failures
+   - **Visual Feedback**: Enhanced loading states and success indicators throughout the authentication flow
+
+5. **Supabase Configuration Guide**:
+   - **Email Template Configuration**: Provided detailed instructions for configuring Supabase email templates to send OTP codes
+   - **SMTP Setup Guidance**: Documentation for production SMTP configuration requirements
+   - **Debug Functions**: Added diagnostic tools to help verify Supabase configuration and troubleshoot OTP delivery issues
+
+6. **Technical Implementation Details**:
+   - **Authentication Context**: Enhanced SupabaseAuthContext with improved OTP handling
+   - **Route Protection**: Added safety checks to prevent invalid navigation flows
+   - **State Synchronization**: Improved synchronization between local PIN verification and Supabase authentication
+   - **Error Recovery**: Better error handling and recovery mechanisms for authentication failures
+
+7. **Navigation Flow Updates**:
+   - **Correct Signup Flow**: SignupScreen → VerifyEmailScreen → SetPinScreen → MainTabs
+   - **Correct Login Flow**: LoginScreen → MainTabs (with PIN or password authentication)
+   - **Flow Validation**: Added checks to ensure users follow the intended authentication paths
+
 ## Member Details Modal Implementation (2025-07-29)
 
 Implemented a Member Details modal sheet in AllMembersScreen that appears when clicking on any member:
@@ -493,7 +539,7 @@ Added a new screen for changing security PIN:
 3. **UI Features**:
    - Custom styled PIN input fields with toggle visibility icons
    - Consistent styling with the security screen design guidelines
-   - Specific colors as provided: 
+   - Specific colors as provided:
      - Input background: #F2F2F2
      - Button background: #EAEAEA
      - Input text color: #1C1C1C

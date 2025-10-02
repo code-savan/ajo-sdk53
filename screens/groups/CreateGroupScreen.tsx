@@ -16,6 +16,7 @@ import { ArrowLeft, ChevronRight } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
+import { apiPost } from '../../lib/api';
 
 export default function CreateGroupScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -25,20 +26,44 @@ export default function CreateGroupScreen() {
   const [goalAmount, setGoalAmount] = useState('2400');
   const [contributionAmount, setContributionAmount] = useState('200');
   const [frequency, setFrequency] = useState('Monthly');
+  const [selection, setSelection] = useState('Random');
   const [showFrequencyOptions, setShowFrequencyOptions] = useState(false);
+  const [showSelectionOptions, setShowSelectionOptions] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleGoBack = () => {
     navigation.goBack();
   };
 
-  const handleCreateGroup = () => {
-    // Handle group creation logic here
-    console.log('Creating group...');
-    navigation.navigate('GroupCreated');
+  const handleCreateGroup = async () => {
+    try {
+      setSubmitting(true);
+      setError(null);
+      const payload = {
+        name: groupName,
+        description: groupDescription,
+        size: Number(groupSize),
+        goal_amount_cents: Math.round(Number(goalAmount) * 100),
+        contribution_amount_cents: Math.round(Number(contributionAmount) * 100),
+        frequency: frequency.toLowerCase(),
+        payout_order_strategy: selection.toLowerCase() === 'random' ? 'random_fixed' : 'join_order',
+      };
+      await apiPost('/api/groups', payload);
+      navigation.navigate('GroupCreated');
+    } catch (e: any) {
+      setError('Failed to create group');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const selectFrequency = (selectedFrequency: string) => {
     setFrequency(selectedFrequency);
+    setShowFrequencyOptions(false);
+  };
+  const selectSelection = (selectedSelection: string) => {
+    setSelection(selectedSelection);
     setShowFrequencyOptions(false);
   };
 
@@ -65,7 +90,6 @@ export default function CreateGroupScreen() {
               <ArrowLeft width={24} height={24} color="#000000" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Create group</Text>
-            {/* <View style={styles.headerSpacer} /> */}
           </View>
 
           <ScrollView
@@ -79,6 +103,7 @@ export default function CreateGroupScreen() {
                 Start a new savings circle by setting your rules, inviting members,
                 and building toward your financial goals.
               </Text>
+              {error ? <Text style={{ color: '#ef4444', marginTop: 8 }}>{error}</Text> : null}
             </View>
 
             {/* Group Name */}
@@ -161,6 +186,39 @@ export default function CreateGroupScreen() {
               </View>
             </View>
 
+             {/* Selection Type */}
+             <View style={styles.inputSection}>
+              <Text style={styles.inputLabel}>Selection Type</Text>
+              <TouchableOpacity
+                style={styles.inputContainer}
+                onPress={() => {
+                  setShowSelectionOptions(!showSelectionOptions);
+                  Keyboard.dismiss();
+                }}
+              >
+                <Text style={styles.input}>{selection}</Text>
+                <ChevronRight width={16} height={16} color="#000000" />
+              </TouchableOpacity>
+
+              {showSelectionOptions && (
+                <View style={styles.frequencyOptions}>
+                  <TouchableOpacity
+                    style={styles.frequencyOption}
+                    onPress={() => selectSelection('Random')}
+                  >
+                    <Text style={styles.frequencyOptionText}>Random</Text>
+                  </TouchableOpacity>
+                  <View style={styles.optionDivider} />
+                  <TouchableOpacity
+                    style={styles.frequencyOption}
+                    onPress={() => selectSelection('Order')}
+                  >
+                    <Text style={styles.frequencyOptionText}>Ordered</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
             {/* Frequency */}
             <View style={styles.inputSection}>
               <Text style={styles.inputLabel}>Frequency</Text>
@@ -205,10 +263,11 @@ export default function CreateGroupScreen() {
 
             <View style={styles.buttonContainer}>
               <TouchableOpacity
-                style={styles.createButton}
+                style={[styles.createButton, submitting && { opacity: 0.6 }]}
                 onPress={handleCreateGroup}
+                disabled={submitting}
               >
-                <Text style={styles.createButtonText}>Create group</Text>
+                <Text style={styles.createButtonText}>{submitting ? 'Creating...' : 'Create group'}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

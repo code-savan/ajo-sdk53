@@ -1,9 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, Modal, TextInput, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, Modal, TextInput, Dimensions, Alert, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react-native';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
+import * as SecureStore from 'expo-secure-store';
 
 // Define navigation prop types
 interface SecurityScreenProps {
@@ -11,16 +13,235 @@ interface SecurityScreenProps {
 }
 
 const SecurityScreen: React.FC<SecurityScreenProps> = ({ navigation }) => {
-  const [biometricsEnabled, setBiometricsEnabled] = React.useState(false);
+  const {
+    biometricEnabled,
+    biometricType,
+    enableBiometric,
+    disableBiometric,
+    verifyPin,
+    signOut,
+    user
+  } = useAuth();
+
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [pin, setPin] = React.useState('');
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  const [showPinModal, setShowPinModal] = React.useState(false);
+  const [pinForBiometric, setPinForBiometric] = React.useState('');
+  const [localBiometricEnabled, setLocalBiometricEnabled] = React.useState(biometricEnabled);
+
+  // Update local state when context state changes
+  React.useEffect(() => {
+    setLocalBiometricEnabled(biometricEnabled);
+  }, [biometricEnabled]);
 
   const handleGoBack = () => {
     navigation.goBack();
   };
 
-  const toggleBiometrics = () => {
-    setBiometricsEnabled((previousState) => !previousState);
+  const toggleBiometrics = async () => {
+    if (isProcessing) return;
+
+    try {
+      if (!localBiometricEnabled) {
+        // Enabling biometrics - show PIN verification modal first
+        setShowPinModal(true);
+      } else {
+        // Disabling biometrics
+        Alert.alert(
+          'Disable Biometrics',
+          'Are you sure you want to disable biometric authentication?',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel'
+            },
+            {
+              text: 'Disable',
+              style: 'destructive',
+              onPress: async () => {
+                setIsProcessing(true);
+                try {
+                  await disableBiometric();
+                  setLocalBiometricEnabled(false);
+                  Alert.alert('Success', 'Biometric authentication has been disabled.');
+                } catch (error: any) {
+                  Alert.alert('Error', error.message || 'Failed to disable biometrics');
+                } finally {
+                  setIsProcessing(false);
+                }
+              }
+            }
+          ]
+        );
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to toggle biometrics');
+    }
+  };
+
+  const handleEnableBiometric = async () => {
+    if (pinForBiometric.length !== 4) {
+      Alert.alert('Error', 'Please enter your 4-digit PIN');
+      return;
+    }
+
+    console.log('=== BIOMETRIC ENABLE DEBUG INFO ===');
+    console.log('Current biometricType from context:', biometricType);
+    console.log('Current biometricEnabled from context:', biometricEnabled);
+    console.log('Current localBiometricEnabled:', localBiometricEnabled);
+    console.log('User object:', user?.id ? 'Present' : 'Missing');
+
+    setIsProcessing(true);
+    try {
+      console.log('Starting biometric enable process...');
+
+      // First verify the PIN
+      const isPinValid = await verifyPin(pinForBiometric);
+      if (!isPinValid) {
+        Alert.alert('Error', 'Incorrect PIN');
+        return;
+      }
+
+      console.log('PIN verified successfully');
+
+      // Close the PIN modal
+      setShowPinModal(false);
+      setPinForBiometric('');
+
+      // Dismiss keyboard to prevent blocking biometric popup
+      Keyboard.dismiss();
+
+      // Add a small delay to ensure keyboard is fully dismissed
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Check if biometrics are available
+      const LocalAuth = await import('expo-local-authentication');
+      const hasHardware = await LocalAuth.hasHardwareAsync();
+      const isEnrolled = await LocalAuth.isEnrolledAsync();
+      const supportedTypes = await LocalAuth.supportedAuthenticationTypesAsync();
+
+      console.log('Biometric availability check:', {
+        hasHardware,
+        isEnrolled,
+        supportedTypes,
+        biometricType
+      });
+
+      // Let's also check the security level
+      try {
+        const securityLevel = await LocalAuth.getEnrolledLevelAsync();
+        console.log('Security level:', securityLevel);
+      } catch (secError) {
+        console.log('Could not get security level:', secError);
+      }
+
+      if (!hasHardware) {
+        Alert.alert('Hardware Not Available', 'This device does not support biometric authentication');
+        return;
+      }
+
+      if (!isEnrolled) {
+        Alert.alert('Biometrics Not Set Up', 'Please set up Face ID or Touch ID in your device settings first');
+        return;
+      }
+
+      if (supportedTypes.length === 0) {
+        Alert.alert('No Biometric Types', 'No biometric authentication types are available on this device');
+        return;
+      }
+
+      console.log('Biometric hardware available, prompting for authentication...');
+
+      // Prompt for biometric authentication with minimal options
+      const result = await LocalAuth.authenticateAsync({
+        promptMessage: 'Use your biometric to enable this feature',
+      });
+
+      console.log('Biometric authentication result:', result);
+
+      if (!result.success) {
+        console.log('Biometric authentication failed. Result:', JSON.stringify(result, null, 2));
+
+        // Handle different failure reasons
+        if (result.error === 'user_cancel') {
+          Alert.alert('Cancelled', 'You cancelled the biometric authentication');
+          return;
+        } else if (result.error === 'not_available') {
+          Alert.alert('Not Available', 'Biometric authentication is not available on this device');
+          return;
+        } else if (result.error === 'not_enrolled') {
+          Alert.alert('Not Set Up', 'Please set up Face ID or Touch ID in your device settings first');
+          return;
+        } else if (result.error === 'lockout') {
+          Alert.alert('Locked Out', 'Too many failed attempts. Please try again later or use your device passcode');
+          return;
+        } else {
+          Alert.alert('Authentication Failed', `Biometric authentication failed: ${result.error || 'Unknown error'}`);
+          return;
+        }
+      }
+
+      // Check for Face ID permission warning
+      if (result.warning && result.warning.includes('NSFaceIDUsageDescription')) {
+        Alert.alert(
+          'App Update Required',
+          'The app needs to be updated to properly support Face ID. Please restart the app or reinstall it from the App Store.',
+          [
+            { text: 'OK', onPress: () => {} }
+          ]
+        );
+        return;
+      }
+
+      console.log('Biometric authentication successful, updating database...');
+
+      // Get stored password and save biometric settings
+      const storedPassword = await SecureStore.getItemAsync('user_password');
+
+      // Save biometric settings locally
+      await SecureStore.setItemAsync('biometric_enabled', 'true');
+      if (storedPassword) {
+        await SecureStore.setItemAsync('user_password', storedPassword);
+      }
+
+      // Update database if user exists
+      if (user?.id) {
+        const { supabase } = await import('../../lib/supabase');
+        const { error } = await supabase
+          .from('users')
+          .update({
+            biometric_enabled: true,
+            biometric_type: biometricType,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id);
+
+        if (error) {
+          console.error('Database update error:', error);
+          // Don't fail the whole process for database errors
+        }
+      }
+
+      console.log('Biometric enabled successfully');
+
+      // Update local state immediately
+      setLocalBiometricEnabled(true);
+
+      Alert.alert(
+        'Success',
+        `${biometricType === 'face_id' ? 'Face ID' : biometricType === 'fingerprint' ? 'Fingerprint' : 'Biometric'} authentication has been enabled.`
+      );
+
+    } catch (error: any) {
+      console.error('Biometric enable error:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to enable biometric authentication'
+      );
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleChangePinPress = () => {
@@ -63,12 +284,25 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ navigation }) => {
       <View style={styles.option}>
         <View style={styles.optionContent}>
           <Text style={styles.optionTitle}>Enable biometrics</Text>
-          <Text style={styles.optionDescription}>Enable/disable biometric authentication (Face/Touch ID)</Text>
+          <Text style={styles.optionDescription}>
+            {biometricType ?
+              `Enable/disable ${biometricType === 'face_id' ? 'Face ID' : biometricType === 'fingerprint' ? 'Touch ID' : 'biometric'} authentication` :
+              'Biometric authentication not available on this device'}
+          </Text>
         </View>
-        <Switch
-          onValueChange={toggleBiometrics}
-          value={biometricsEnabled}
-        />
+        {biometricType ? (
+          isProcessing ? (
+            <ActivityIndicator size="small" color="#000" />
+          ) : (
+            <Switch
+              onValueChange={toggleBiometrics}
+              value={localBiometricEnabled}
+              disabled={isProcessing}
+            />
+          )
+        ) : (
+          <Text style={styles.unavailableText}>N/A</Text>
+        )}
       </View>
 
       <TouchableOpacity style={styles.option} onPress={() => setShowDeleteModal(true)}>
@@ -85,12 +319,22 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ navigation }) => {
         transparent={true}
         onRequestClose={() => setShowDeleteModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.bottomSheet}>
-            <Text style={styles.modalTitle}>Delete account</Text>
-            <TouchableOpacity onPress={() => setShowDeleteModal(false)} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowDeleteModal(false)}
+          />
+          <View style={styles.keyboardAwareBottomSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Delete account</Text>
+              <TouchableOpacity onPress={() => setShowDeleteModal(false)} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.deleteIconContainer}>
               <View style={styles.deleteIconWrapper}>
@@ -118,7 +362,72 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ navigation }) => {
               <Text style={styles.saveButtonText}>Delete account</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* PIN Verification Modal for Biometric Enable */}
+      <Modal
+        visible={showPinModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          setShowPinModal(false);
+          setPinForBiometric('');
+        }}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => {
+              setShowPinModal(false);
+              setPinForBiometric('');
+            }}
+          />
+          <View style={styles.keyboardAwareBottomSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Verify PIN</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowPinModal(false);
+                  setPinForBiometric('');
+                }}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalText}>Enter your PIN to enable biometric authentication</Text>
+
+            <TextInput
+              style={styles.pinInput}
+              value={pinForBiometric}
+              onChangeText={setPinForBiometric}
+              placeholder="****"
+              placeholderTextColor="#999"
+              secureTextEntry={true}
+              keyboardType="numeric"
+              maxLength={4}
+              autoFocus
+            />
+
+            <TouchableOpacity
+              style={[styles.saveButton, pinForBiometric.length !== 4 && styles.disabledButton]}
+              disabled={pinForBiometric.length !== 4 || isProcessing}
+              onPress={handleEnableBiometric}
+            >
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.saveButtonText}>Enable Biometric</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -197,8 +506,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#4D4845',
-    marginBottom: 40,
-    alignSelf: 'flex-start',
+    flex: 1,
   },
   closeButton: {
     width: 40,
@@ -208,9 +516,6 @@ const styles = StyleSheet.create({
     borderColor: "#CACACA",
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'absolute',
-    top: 20,
-    right: 20,
   },
   closeButtonText: {
     fontSize: 16,
@@ -261,6 +566,49 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#FFFFFF',
+  },
+  unavailableText: {
+    fontSize: 14,
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  disabledButton: {
+    backgroundColor: '#666',
+    opacity: 0.7,
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+  },
+  keyboardAwareBottomSheet: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 40,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -3,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 5,
+    position: 'relative',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 20,
   },
 });
 

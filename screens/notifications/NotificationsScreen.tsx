@@ -1,81 +1,20 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, CheckCircle, AlertCircle, InfoIcon, Calendar } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
+import { apiGet } from '../../lib/api';
+import { useToast } from '../../contexts/ToastContext';
 
 type NotificationsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
-// Avatar image URLs for notification avatars
-const femaleAvatarUrl = "https://images.unsplash.com/photo-1543085784-0b3c85b4e8ac?q=80&w=987";
-const maleAvatarUrl = "https://images.unsplash.com/photo-1614248793396-944d024ec422?q=80&w=1064";
-
-// Sample notification data
-const notifications = [
-  {
-    id: '1',
-    type: 'success',
-    title: 'Payment successful',
-    message: 'Your payment of $100 to Hawaii Vacation has been processed successfully.',
-    time: '2 mins ago',
-    read: false
-  },
-  {
-    id: '2',
-    type: 'alert',
-    title: 'Payment due soon',
-    message: 'Your monthly contribution of $100 for Cooking Fees is due in 2 days.',
-    time: '1 hour ago',
-    read: false
-  },
-  {
-    id: '3',
-    type: 'info',
-    title: 'Debbie joined your group',
-    message: 'Debbie has joined your Hawaii Vacation group.',
-    time: 'Yesterday',
-    read: true,
-    avatar: femaleAvatarUrl
-  },
-  {
-    id: '4',
-    type: 'success',
-    title: 'Group created',
-    message: 'Your TV Prep group has been created successfully.',
-    time: '2 days ago',
-    read: true
-  },
-  {
-    id: '5',
-    type: 'info',
-    title: 'Angus joined your group',
-    message: 'Angus has joined your Hawaii Vacation group.',
-    time: '3 days ago',
-    read: true,
-    avatar: maleAvatarUrl
-  },
-  {
-    id: '6',
-    type: 'alert',
-    title: 'Collection time',
-    message: 'It\'s your turn to collect funds from the Hawaii Vacation group.',
-    time: '5 days ago',
-    read: true
-  },
-  {
-    id: '7',
-    type: 'calendar',
-    title: 'Payment reminder',
-    message: 'Your next payment for TV Prep is scheduled for tomorrow.',
-    time: '1 week ago',
-    read: true
-  }
-];
-
 export default function NotificationsScreen() {
   const navigation = useNavigation<NotificationsScreenNavigationProp>();
+  const { showToast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<any[]>([]);
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -95,6 +34,33 @@ export default function NotificationsScreen() {
     }
   };
 
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await apiGet('/api/notifications?page=1&limit=50');
+        const list = res?.data || res?.data?.data || res?.data || [];
+        const flat = Array.isArray(list) ? list : (Array.isArray(res?.data?.data) ? res.data.data : []);
+        setItems(flat);
+      } catch {
+        setItems([]);
+        showToast({ message: 'Failed to load notifications.', variant: 'error' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    const unsub = navigation.addListener('focus', load);
+    load();
+    return unsub;
+  }, [navigation]);
+
+  const news = items.filter(n => !n.read);
+  const earlier = items.filter(n => n.read);
+
+  const handleOpen = (n: any) => {
+    navigation.navigate('NotificationDetail' as never, { notification: { id: n.id, title: n.title, message: n.message, type: n.type } } as never);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -105,55 +71,55 @@ export default function NotificationsScreen() {
         {/* <View style={styles.emptyView} /> */}
       </View>
 
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
-          <Text style={styles.subtitle}>Stay up to date with your recent notifications.</Text>
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 20 }} />
+      ) : (
+        <ScrollView style={styles.scrollView}>
+          <View style={styles.content}>
+            <Text style={styles.subtitle}>Stay up to date with your recent notifications.</Text>
 
-          <View style={styles.notificationGroup}>
-            <Text style={styles.groupTitle}>New</Text>
-            {notifications.filter(n => !n.read).map(notification => (
-              <TouchableOpacity key={notification.id} style={[styles.notificationItem, !notification.read && styles.unreadItem]}>
-                <View style={styles.iconContainer}>
-                  {notification.avatar ? (
-                    <Image source={{ uri: notification.avatar }} style={styles.avatar} />
-                  ) : (
-                    getNotificationIcon(notification.type)
-                  )}
-                </View>
-                <View style={styles.notificationContent}>
-                  <View style={styles.notificationHeader}>
-                    <Text style={styles.notificationTitle}>{notification.title}</Text>
-                    <Text style={styles.notificationTime}>{notification.time}</Text>
+            <View style={styles.notificationGroup}>
+              <Text style={styles.groupTitle}>New</Text>
+              {news.length === 0 ? (
+                <Text style={{ color: '#6B7280' }}>No new notifications.</Text>
+              ) : news.map(n => (
+                <TouchableOpacity key={n.id} style={[styles.notificationItem, !n.read && styles.unreadItem]} onPress={() => handleOpen(n)}>
+                  <View style={styles.iconContainer}>
+                    {getNotificationIcon(n.type)}
                   </View>
-                  <Text style={styles.notificationMessage}>{notification.message}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+                  <View style={styles.notificationContent}>
+                    <View style={styles.notificationHeader}>
+                      <Text style={styles.notificationTitle}>{n.title}</Text>
+                      <Text style={styles.notificationTime}>{new Date(n.created_at).toLocaleString()}</Text>
+                    </View>
+                    <Text style={styles.notificationMessage}>{n.message}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-          <View style={styles.notificationGroup}>
-            <Text style={styles.groupTitle}>Earlier</Text>
-            {notifications.filter(n => n.read).map(notification => (
-              <TouchableOpacity key={notification.id} style={styles.notificationItem}>
-                <View style={styles.iconContainer}>
-                  {notification.avatar ? (
-                    <Image source={{ uri: notification.avatar }} style={styles.avatar} />
-                  ) : (
-                    getNotificationIcon(notification.type)
-                  )}
-                </View>
-                <View style={styles.notificationContent}>
-                  <View style={styles.notificationHeader}>
-                    <Text style={styles.notificationTitle}>{notification.title}</Text>
-                    <Text style={styles.notificationTime}>{notification.time}</Text>
+            <View style={styles.notificationGroup}>
+              <Text style={styles.groupTitle}>Earlier</Text>
+              {earlier.length === 0 ? (
+                <Text style={{ color: '#6B7280' }}>No earlier notifications.</Text>
+              ) : earlier.map(n => (
+                <TouchableOpacity key={n.id} style={styles.notificationItem} onPress={() => handleOpen(n)}>
+                  <View style={styles.iconContainer}>
+                    {getNotificationIcon(n.type)}
                   </View>
-                  <Text style={styles.notificationMessage}>{notification.message}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                  <View style={styles.notificationContent}>
+                    <View style={styles.notificationHeader}>
+                      <Text style={styles.notificationTitle}>{n.title}</Text>
+                      <Text style={styles.notificationTime}>{new Date(n.created_at).toLocaleString()}</Text>
+                    </View>
+                    <Text style={styles.notificationMessage}>{n.message}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -180,7 +146,7 @@ const styles = StyleSheet.create({
     color: '#1C1C1C',
   },
   emptyView: {
-    width: 24, // Same width as back button for balanced centering
+    width: 24,
   },
   scrollView: {
     flex: 1,
@@ -207,8 +173,6 @@ const styles = StyleSheet.create({
   notificationItem: {
     flexDirection: 'row',
     paddingVertical: 16,
-    // borderBottomWidth: 1,
-    // borderBottomColor: '#F2F2F2',
   },
   unreadItem: {
     backgroundColor: '#F9FAFB',
@@ -221,11 +185,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
   },
   notificationContent: {
     flex: 1,

@@ -1,21 +1,77 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
+import { apiGet, apiPost } from '../../lib/api';
 
 export default function WithdrawFundsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const [amount, setAmount] = useState('$100');
+  const [loading, setLoading] = useState(true);
+  const [groupId, setGroupId] = useState<string | null>(null);
+  const [availableCents, setAvailableCents] = useState<number>(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        // pick first group the user belongs to (MVP)
+        const groups = await apiGet<any[]>('/api/groups');
+        const g = groups?.[0];
+        if (g) {
+          setGroupId(g.id);
+          const bal = await apiGet(`/api/groups/${g.id}/balance`);
+          // in MVP, get current user's id net from perUserNetCents
+          const me = await apiGet('/api/users/profile');
+          const net = bal?.perUserNetCents?.[me?.id] || 0;
+          setAvailableCents(net);
+        } else {
+          setGroupId(null);
+          setAvailableCents(0);
+        }
+      } catch {
+        setError('Failed to load balance');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const handleGoBack = () => {
     navigation.goBack();
   };
 
-//   const handleProceed = () => {
-//     navigation.navigate('BankTransferDetails');
-//   };
+  const handleProceed = async () => {
+    if (!groupId) {
+      Alert.alert('No group', 'Join or create a group first.');
+      return;
+    }
+    const cents = Math.round(parseFloat(amount.replace('$', '')) * 100);
+    if (cents <= 0) {
+      Alert.alert('Invalid amount', 'Enter a valid amount.');
+      return;
+    }
+    if (cents > availableCents) {
+      Alert.alert('Insufficient funds', 'Amount exceeds your available credits.');
+      return;
+    }
+    try {
+      setSubmitting(true);
+      await apiPost(`/api/groups/${groupId}/withdraw`, { amount_cents: cents });
+      Alert.alert('Requested', 'Withdrawal initiated.');
+      navigation.goBack();
+    } catch (e: any) {
+      Alert.alert('Error', 'Withdrawal failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -32,6 +88,15 @@ export default function WithdrawFundsScreen() {
           <Text style={styles.subtitle}>
             Easily transfer money from your wallet to your linked bank account.
           </Text>
+          {loading ? <ActivityIndicator style={{ marginTop: 8 }} /> : null}
+          {groupId ? (
+            <Text style={{ marginTop: 8, color: '#6B7280' }}>
+              Available: ${(availableCents/100).toFixed(2)}
+            </Text>
+          ) : (
+            <Text style={{ marginTop: 8, color: '#ef4444' }}>No group found.</Text>
+          )}
+          {error ? <Text style={{ marginTop: 8, color: '#ef4444' }}>{error}</Text> : null}
         </View>
 
         <View style={styles.inputSection}>
@@ -42,6 +107,7 @@ export default function WithdrawFundsScreen() {
               placeholder="$100"
               keyboardType="decimal-pad"
               defaultValue="$100"
+              onChangeText={(t)=>setAmount(t.startsWith('$')?t:`$${t}`)}
             />
           </View>
         </View>
@@ -54,10 +120,8 @@ export default function WithdrawFundsScreen() {
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.proceedButton}
-        //   onPress={handleProceed}
-          >
-            <Text style={styles.proceedButtonText}>Proceed</Text>
+          <TouchableOpacity style={[styles.proceedButton, submitting && { opacity: 0.6 }]} onPress={handleProceed} disabled={submitting || loading || !groupId}>
+            <Text style={styles.proceedButtonText}>{submitting ? 'Processing...' : 'Proceed'}</Text>
           </TouchableOpacity>
         </View>
       </View>

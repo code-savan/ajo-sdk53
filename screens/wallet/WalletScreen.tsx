@@ -1,22 +1,134 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import BottomNavigation from '../../components/BottomNavigation';
-import { Bell, ChevronDown, ChevronUp, Settings } from 'lucide-react-native';
+import { Bell, Settings, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { apiGet, apiPost } from '../../lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../../lib/supabase';
+
+const recentKeyFor = (uid?: string|null) => `wallet_recent_txns_v1:${uid || 'anon'}`;
 
 export default function WalletScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-  
+  const [balanceCents, setBalanceCents] = useState(0);
+  const [pendingCents, setPendingCents] = useState(0);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.auth.getSession().catch(()=>({ data: { session: null } as any }))
+      const uid = data?.session?.user?.id || null
+      const CACHE_KEY = recentKeyFor(uid)
+
+      // Hydrate cached txns immediately; only show skeleton if no cache
+      let hadCache = false
+      try {
+        const cached = await AsyncStorage.getItem(CACHE_KEY)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setTransactions(parsed)
+            hadCache = true
+          }
+        }
+      } catch {}
+      setTransactionsLoading(!hadCache)
+
+      try {
+        // Always refresh balance/pending
+        const [balance, pending] = await Promise.all([
+          apiGet('/api/wallet/balance').catch(()=>({ balanceCents: 0 })),
+          apiGet('/api/wallet/pending').catch(()=>({ pending_cents: 0 })),
+        ]);
+        setBalanceCents(Number(balance?.balanceCents || 0));
+        setPendingCents(Number((pending as any)?.pending_cents || 0));
+
+        // Incremental fetch
+        const latest = (transactions && transactions.length>0) ? transactions[0].occurred_at : undefined
+        const params = latest ? `?since=${encodeURIComponent(latest)}&limit=20` : `?limit=20`
+        const fresh = await apiGet(`/api/me/transactions${params}`).catch(()=>([]))
+        let merged: any[]
+        if (Array.isArray(fresh) && fresh.length > 0) {
+          const existingById = new Map((transactions||[]).map(t=>[t.id, t]))
+          for (const f of fresh) existingById.set(f.id, f)
+          merged = Array.from(existingById.values()).sort((a,b)=> new Date(b.occurred_at).getTime()-new Date(a.occurred_at).getTime())
+        } else {
+          merged = transactions || []
+        }
+        const preview = (merged || []).slice(0,4)
+        setTransactions(preview)
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(preview)).catch(()=>{})
+      } finally {
+        setTransactionsLoading(false);
+      }
+    };
+    const unsub = navigation.addListener('focus', load);
+    load();
+    return unsub;
+  }, [navigation]);
+
   const handleNotificationsPress = () => {
     navigation.dispatch(CommonActions.navigate('Notifications'));
   };
-  
+
   const handleWalletAndPaymentPress = () => {
     navigation.dispatch(CommonActions.navigate('WalletAndPayment'));
   };
+
+  const renderTxn = ({ item }: { item: any }) => {
+    const isPositive = item.direction === 'credit';
+    const amount = (Number(item.amount_cents)/100).toLocaleString('en-US',{ style: 'currency', currency: (item.currency||'USD').toUpperCase() });
+    const title = item.source === 'deposit' ? 'Deposit' : item.source === 'withdrawal' ? 'Withdrawal' : item.source === 'rotation_earning' ? 'Pickup' : item.source === 'contribution' ? 'Deposit' : item.source;
+    const subtitle = item.source === 'contribution' ? 'Contribution' : 'Wallet';
+    const dt = new Date(item.occurred_at);
+    const now = new Date();
+    const isToday = dt.toDateString() === now.toDateString();
+    const yesterday = new Date(now); yesterday.setDate(now.getDate()-1);
+    const rightTime = isToday ? dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : (dt.toDateString() === yesterday.toDateString() ? 'Yesterday' : dt.toLocaleDateString([], { month: 'short', day: 'numeric' }));
+    return (
+      <View style={styles.txnRow}>
+        {/* <View style={styles.txnIcon} /> */}
+        <View style={styles.transactionIconContainer}>
+        {isPositive ? (
+          <ChevronUp width={24} height={24} color="#4D4845" />
+        ) : (
+          <ChevronDown width={24} height={24} color="#4D4845" />
+        )}
+      </View>
+        <View style={styles.txnLeft}>
+          <Text style={styles.txnTitle}>{title}</Text>
+          <Text style={styles.txnSub}>{subtitle}</Text>
+        </View>
+        <View style={styles.txnRight}>
+          <Text style={[styles.txnAmount, isPositive ? styles.positive : styles.negative]}>{amount}</Text>
+          <Text style={styles.txnRightTime}>{rightTime}</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderTxnSkeleton = () => (
+    <>
+      {[1,2,3,4].map(i => (
+        <View key={i} style={styles.txnRow}>
+          <View style={[styles.txnIcon, { backgroundColor: '#F3F4F6' }]} />
+          <View style={styles.txnInfo}>
+            <View>
+              <View style={styles.skelBarShort} />
+              <View style={styles.skelBarTiny} />
+            </View>
+            <View style={styles.skelBarAmount} />
+          </View>
+        </View>
+      ))}
+    </>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
@@ -24,137 +136,46 @@ export default function WalletScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>My Wallet</Text>
             <View style={styles.headerActions}>
-              <TouchableOpacity 
-                style={styles.settingsButton}
-                onPress={handleWalletAndPaymentPress}
-              >
+              <TouchableOpacity style={styles.settingsButton} onPress={handleWalletAndPaymentPress}>
                 <Settings width={22} height={22} color="#4D4845" />
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.notificationContainer}
-                onPress={handleNotificationsPress}
-              >
+              <TouchableOpacity style={styles.notificationContainer} onPress={handleNotificationsPress}>
                 <Bell width={24} height={24} color="#4D4845" />
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>3</Text>
-                </View>
               </TouchableOpacity>
             </View>
           </View>
 
-          <View style={styles.balanceContainer}>
-            <Text style={styles.balanceLabel}>Wallet Balance</Text>
-            <Text style={styles.balanceAmount}>$5,200.00</Text>
-            <View style={styles.pendingContainer}>
-              <Text style={styles.pendingText}>Pending Funds: $3,500.00</Text>
-            </View>
+          <Text style={styles.balanceLabel}>Wallet Balance</Text>
+          <Text style={styles.balanceAmount}>{(balanceCents/100).toLocaleString('en-US',{style:'currency',currency:'USD'})}</Text>
+
+          <View style={styles.pendingPill}>
+            <Text style={styles.pendingText}>Pending Funds: {(pendingCents/100).toLocaleString('en-US',{style:'currency',currency:'USD'})}</Text>
           </View>
 
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.dispatch(CommonActions.navigate('FundWallet'))}
-            >
-              <Text style={styles.actionText}>Fund Wallet</Text>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.dispatch(CommonActions.navigate('FundWallet'))}>
+              <Text style={styles.primaryBtnText}>Fund Wallet</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.dispatch(CommonActions.navigate('WithdrawFunds'))}
-            >
-              <Text style={styles.actionText}>Withdraw funds</Text>
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.dispatch(CommonActions.navigate('WithdrawFunds'))}>
+              <Text style={styles.primaryBtnText}>Withdraw funds</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.transactionSection}>
             <Text style={styles.transactionTitle}>Transaction history</Text>
             <Text style={styles.transactionSubtitle}>Here are your recent transactions on the app.</Text>
-
-            <View style={styles.transaction}>
-              <View style={styles.transactionIconContainer}>
-                <ChevronDown width={24} height={24} color="#4D4845" />
-              </View>
-              <View style={styles.transactionInfo}>
-                <View>
-                  <Text style={styles.transactionName}>Deposit</Text>
-                  <Text style={styles.transactionType}>Contribution</Text>
-                </View>
-                <View style={styles.transactionDetails}>
-                  <Text style={styles.transactionAmount}>$100.0</Text>
-                  <Text style={styles.transactionTime}>12:45pm</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.transaction}>
-              <View style={styles.transactionIconContainer}>
-                <ChevronUp width={24} height={24} color="#4D4845" />
-              </View>
-              <View style={styles.transactionInfo}>
-                <View>
-                  <Text style={styles.transactionName}>Pickup</Text>
-                  <Text style={styles.transactionType}>Contribution</Text>
-                </View>
-                <View style={styles.transactionDetails}>
-                  <Text style={[styles.transactionAmount, styles.positive]}>$1000</Text>
-                  <Text style={styles.transactionTime}>Yesterday</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.transaction}>
-              <View style={styles.transactionIconContainer}>
-                <ChevronDown width={24} height={24} color="#4D4845" />
-              </View>
-              <View style={styles.transactionInfo}>
-                <View>
-                  <Text style={styles.transactionName}>Deposit</Text>
-                  <Text style={styles.transactionType}>Contribution</Text>
-                </View>
-                <View style={styles.transactionDetails}>
-                  <Text style={styles.transactionAmount}>$100.0</Text>
-                  <Text style={styles.transactionTime}>12:45pm</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.transaction}>
-              <View style={styles.transactionIconContainer}>
-                <ChevronDown width={24} height={24} color="#4D4845" />
-              </View>
-              <View style={styles.transactionInfo}>
-                <View>
-                  <Text style={styles.transactionName}>Deposit</Text>
-                  <Text style={styles.transactionType}>Contribution</Text>
-                </View>
-                <View style={styles.transactionDetails}>
-                  <Text style={styles.transactionAmount}>$100.0</Text>
-                  <Text style={styles.transactionTime}>12:45pm</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.transaction}>
-              <View style={styles.transactionIconContainer}>
-                <ChevronDown width={24} height={24} color="#4D4845" />
-              </View>
-              <View style={styles.transactionInfo}>
-                <View>
-                  <Text style={styles.transactionName}>Withdrawal</Text>
-                  <Text style={styles.transactionType}>Wallet</Text>
-                </View>
-                <View style={styles.transactionDetails}>
-                  <Text style={styles.transactionAmount}>$19.99</Text>
-                  <Text style={styles.transactionTime}>Feb 11</Text>
-                </View>
-              </View>
-            </View>
-
-            <TouchableOpacity 
-              style={styles.viewAllButton}
-              onPress={() => navigation.dispatch(CommonActions.navigate('Transactions'))}
-            >
-              <Text style={styles.viewAllText}>View all transactions</Text>
-            </TouchableOpacity>
+            {transactionsLoading ? (
+              renderTxnSkeleton()
+            ) : transactions.length === 0 ? (
+              <Text style={styles.transactionSubtitle}>No transactions yet.</Text>
+            ) : (
+              <>
+                <FlatList data={transactions} renderItem={renderTxn} keyExtractor={(i)=>i.id} scrollEnabled={false} />
+                <TouchableOpacity style={styles.viewAllBtn} onPress={()=>navigation.dispatch(CommonActions.navigate('Transactions'))}>
+                  <Text style={styles.viewAllText}>View all transactions</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -164,174 +185,45 @@ export default function WalletScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 80, // Add bottom padding to avoid content being hidden behind the navigation bar
-    backgroundColor: '#ffffff',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  settingsButton: {
-    padding: 4,
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#4D4845',
-  },
-  notificationContainer: {
-    position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#FF6262',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  balanceContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  balanceLabel: {
-    fontSize: 12,
-    color: '#928F8B',
-    marginBottom: 8,
-  },
-  balanceAmount: {
-    fontSize: 40,
-    fontWeight: 'normal',
-    color: '#4D4845',
-    marginBottom: 20,
-  },
-  pendingContainer: {
-    backgroundColor: '#F2F2F2',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 24,
-  },
-  pendingText: {
-    fontSize: 12,
-    color: '#4D4845',
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 16,
-    marginBottom: 48,
-  },
-  actionButton: {
-    flex: 1,
-    backgroundColor: '#1E1E1E',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#ffffff',
-  },
-  transactionSection: {
-    marginBottom: 24,
-  },
-  transactionTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#4D4845',
-    marginBottom: 8,
-  },
-  transactionSubtitle: {
-    fontSize: 12,
-    color: '#928F8B',
-    marginBottom: 24,
-  },
-  transaction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F2',
-  },
-  transactionIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#ffffff',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderColor: "#F4F4F2",
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  transactionInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  transactionName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#4D4845',
-    marginBottom: 4,
-  },
-  transactionType: {
-    fontSize: 12,
-    color: '#928F8B',
-  },
-  transactionDetails: {
-    alignItems: 'flex-end',
-  },
-  transactionAmount: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#FF6262',
-    marginBottom: 4,
-  },
-  transactionTime: {
-    fontSize: 12,
-    color: '#928F8B',
-  },
-  positive: {
-    color: '#04A73E',
-  },
-  viewAllButton: {
-    backgroundColor: '#F2F2F2',
-    borderRadius: 24,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  viewAllText: {
-    fontSize: 14,
-    color: '#4D4845',
-  },
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  scrollView: { flex: 1 },
+  content: { flex: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 80, backgroundColor: '#ffffff' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  settingsButton: { padding: 4 },
+  notificationContainer: { padding: 4 },
+  title: { fontSize: 14, fontWeight: '500', color: '#4D4845' },
+
+  balanceLabel: { textAlign: 'center', fontSize: 18, color: '#A3A3A3', marginTop: 16 },
+  balanceAmount: { textAlign: 'center', fontSize: 56, color: '#4A4643', fontWeight: '400', marginTop: 8 },
+
+  pendingPill: { alignSelf: 'center', backgroundColor: '#F3F4F6', borderRadius: 28, paddingVertical: 12, paddingHorizontal: 18, marginTop: 16 },
+  pendingText: { color: '#4B5563', fontSize: 16 },
+  transactionIconContainer: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#ffffff', borderStyle: 'solid', borderWidth: 1, borderColor: '#F4F4F2', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  actionsRow: { flexDirection: 'row', gap: 16, marginTop: 28 },
+  primaryBtn: { flex: 1, backgroundColor: '#111111', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+  primaryBtnText: { color: '#FFFFFF', fontSize: 16 },
+
+  transactionSection: { marginTop: 24 },
+  transactionTitle: { fontSize: 16, fontWeight: '500', color: '#111827' },
+  transactionSubtitle: { fontSize: 12, color: '#6B7280', marginTop: 4 , marginBottom: 16},
+
+  txnRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+  txnIcon: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#F4F4F2', backgroundColor: '#ffffff', marginRight: 12 },
+  txnInfo: { flex: 1, flexDirection: 'row', justifyContent: 'space-between' },
+  txnTitle: { fontSize: 14, fontWeight: '500', color: '#4D4845', marginBottom: 4 },
+  txnSub: { fontSize: 12, color: '#928F8B' },
+  txnAmount: { fontSize: 14, fontWeight: '500', color: '#FF6262' },
+  positive: { color: '#04A73E' },
+  negative: { color: '#FF6262' },
+  txnLeft: { flex: 1 },
+  txnRight: { alignItems: 'flex-end' },
+  txnRightTime: { fontSize: 12, color: '#928F8B' },
+
+  viewAllBtn: { alignSelf: 'flex-start', backgroundColor: '#F3F3F3', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, marginTop: 12 },
+  viewAllText: { color: '#4B5563', fontSize: 14 },
+
+  skelBarShort: { width: 120, height: 12, backgroundColor: '#E5E7EB', borderRadius: 6, marginBottom: 8 },
+  skelBarTiny: { width: 80, height: 10, backgroundColor: '#E5E7EB', borderRadius: 5 },
+  skelBarAmount: { width: 60, height: 12, backgroundColor: '#E5E7EB', borderRadius: 6, alignSelf: 'flex-end' },
 });

@@ -1,34 +1,55 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, CheckCircle, CircleCheck } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { ArrowLeft } from 'lucide-react-native';
+import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
+import { apiGet } from '../../lib/api';
 
 export default function WalletFundedScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'WalletFunded'>>();
+  const { payment_intent_id, amount_cents, currency } = route.params || {};
   const [isConfirming, setIsConfirming] = useState(true);
+  const [confirmed, setConfirmed] = useState(false);
+  const [tx, setTx] = useState<any>(null);
 
-  // Simulate a 3-second loading period
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsConfirming(false);
-    }, 3000);
+    let cancelled = false;
 
-    return () => clearTimeout(timer);
-  }, []);
+    const poll = async () => {
+      if (!payment_intent_id) {
+        // No id to poll with; consider it confirmed after brief delay
+        setTimeout(() => !cancelled && setIsConfirming(false), 1500);
+        return;
+      }
+      // Poll up to ~10s for the ledger entry
+      const started = Date.now();
+      while (!cancelled && Date.now() - started < 10000) {
+        try {
+          const found = await apiGet(`/api/me/transactions/find?external_ref=${encodeURIComponent(payment_intent_id)}&source=deposit`);
+          if (found && found.id) {
+            if (!cancelled) {
+              setTx(found);
+              setConfirmed(true);
+              break;
+            }
+          }
+        } catch {}
+        await new Promise(r => setTimeout(r, 1000));
+      }
+      if (!cancelled) setIsConfirming(false);
+    };
+
+    poll();
+    return () => { cancelled = true };
+  }, [payment_intent_id]);
 
   const handleGoBack = () => {
-    // Navigate to the main tabs and select the Wallet tab
-    // navigation.reset({
-    //   index: 0,
-    //   routes: [{ name: 'MainTabs' }],
-    // });
-    navigation.navigate('MainTabs', { screen: 'Wallet' });
+    navigation.dispatch(CommonActions.navigate('MainTabs', { screen: 'Wallet' } as any));
   };
 
-  // Loading state during confirmation
   if (isConfirming) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -40,7 +61,9 @@ export default function WalletFundedScreen() {
     );
   }
 
-  // Success state after confirmation
+  const displayAmount = (amount_cents || tx?.amount_cents || 0) / 100;
+  const displayCurrency = (currency || tx?.currency || 'USD').toUpperCase();
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -51,32 +74,28 @@ export default function WalletFundedScreen() {
 
       <View style={styles.content}>
         <View style={styles.successSection}>
-        {/* <CircleCheck width={88} height={88} color="#17C964" /> */}
-        {/* <Image
-          source={require('../../assets/images/splash.png')}
-          style={styles.splashImage}
-          resizeMode="contain"
-        /> */}
-        <Image
-        source={require('../../assets/images/approved.png')}
-        style={styles.approved}
-        resizeMode="contain"
-        />
+          <Image
+            source={require('../../assets/images/approved.png')}
+            style={styles.approved}
+            resizeMode="contain"
+          />
           <Text style={styles.successTitle}>Wallet Funded</Text>
           <Text style={styles.successMessage}>
-            Payment successful! Your contribution has been recorded and reflected in the group.
+            Payment successful! Your deposit has been added to your wallet.
           </Text>
         </View>
 
         <View style={styles.transactionDetailsCard}>
           <View style={styles.transactionRow}>
             <Text style={styles.transactionLabel}>Transaction type</Text>
-            <Text style={styles.transactionValue}>Fund</Text>
+            <Text style={styles.transactionValue}>Deposit</Text>
           </View>
 
           <View style={styles.transactionRow}>
             <Text style={styles.transactionLabel}>Amount</Text>
-            <Text style={styles.transactionValue}>$100</Text>
+            <Text style={styles.transactionValue}>
+              {displayAmount.toLocaleString('en-US',{ style:'currency', currency: displayCurrency })}
+            </Text>
           </View>
 
           <View style={styles.transactionRow}>
@@ -87,8 +106,8 @@ export default function WalletFundedScreen() {
           <View style={styles.divider} />
 
           <View style={styles.transactionRow}>
-            <Text style={styles.transactionLabel}>Total amount</Text>
-            <Text style={styles.transactionValue}>$100.00</Text>
+            <Text style={styles.transactionLabel}>Reference</Text>
+            <Text style={styles.transactionValue}>{payment_intent_id || '—'}</Text>
           </View>
         </View>
       </View>
@@ -97,91 +116,20 @@ export default function WalletFundedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingContent: {
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#4D4845',
-    fontWeight: '500',
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    width: 24,
-    height: 24,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  successSection: {
-    alignItems: 'center',
-    marginBottom: 40,
-    paddingHorizontal: 20,
-  },
-  approved: {
-    width: 80,
-    height: 80,
-    borderRadius: 999,
-    marginBottom: 15,
-  },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 16,
-  },
-  successMessage: {
-    fontSize: 16,
-    color: '#6C6C6C',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 20,
-    fontWeight: '400',
-  },
-  transactionDetailsCard: {
-    backgroundColor: '#F2F2F2',
-    borderRadius: 12,
-    padding: 20,
-    width: '100%',
-  },
-  transactionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  transactionLabel: {
-    fontSize: 12,
-    color: '#9A9A9A',
-  },
-  transactionValue: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#4D4845',
-    textAlign: 'right',
-  },
-  divider: {
-    height: 0,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-    borderStyle: 'dashed',
-    marginBottom: 20,
-    width: '100%',
-  },
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  loadingContainer: { flex: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center' },
+  loadingContent: { alignItems: 'center' },
+  loadingText: { marginTop: 16, fontSize: 16, color: '#4D4845', fontWeight: '500' },
+  header: { paddingHorizontal: 20, paddingVertical: 16 },
+  backButton: { width: 24, height: 24 },
+  content: { flex: 1, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
+  successSection: { alignItems: 'center', marginBottom: 40, paddingHorizontal: 20 },
+  approved: { width: 80, height: 80, borderRadius: 999, marginBottom: 15 },
+  successTitle: { fontSize: 24, fontWeight: '600', color: '#000000', marginBottom: 16 },
+  successMessage: { fontSize: 16, color: '#6C6C6C', textAlign: 'center', lineHeight: 24, marginBottom: 20, fontWeight: '400' },
+  transactionDetailsCard: { backgroundColor: '#F2F2F2', borderRadius: 12, padding: 20, width: '100%' },
+  transactionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  transactionLabel: { fontSize: 12, color: '#9A9AA', },
+  transactionValue: { fontSize: 12, fontWeight: '500', color: '#4D4845', textAlign: 'right' },
+  divider: { height: 0, borderBottomWidth: 1, borderBottomColor: '#E5E5E5', borderStyle: 'dashed', marginBottom: 20, width: '100%' },
 });
