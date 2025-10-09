@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "../components/ui";
 import { demoStats, users, groups, transactions } from "../data/adminContent";
+import { useAuth } from "../contexts/AuthContext";
 import Link from "next/link";
 import {
   Users,
@@ -35,11 +36,31 @@ import {
 
 export default function Home() {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const { user, refreshSession } = useAuth();
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Refresh session on user activity
+  useEffect(() => {
+    const handleUserActivity = () => {
+      refreshSession();
+    };
+
+    // Add event listeners for user activity
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      document.addEventListener(event, handleUserActivity, true);
+    });
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, handleUserActivity, true);
+      });
+    };
+  }, [refreshSession]);
 
   const formatTime = (date) => {
     const hours = date.getHours();
@@ -57,31 +78,31 @@ export default function Home() {
     { title: 'Verified Users', value: '2,634', change: '+8%', icon: UserCheck, color: 'emerald' },
     { title: 'New This Month', value: '156', change: '+23%', icon: UserPlus, color: 'violet' },
     { title: 'User Retention', value: '94.2%', change: '+2%', icon: TrendingUp, color: 'indigo' },
-    
+
     // Groups section
     { title: 'Active Groups', value: '142', change: '+8%', icon: UsersRound, color: 'teal' },
     { title: 'Total Members', value: '1,268', change: '+15%', icon: Users, color: 'cyan' },
     { title: 'Groups Created', value: '18', change: '+6%', icon: Building2, color: 'green' },
     { title: 'Completion Rate', value: '87.5%', change: '+4%', icon: CheckCircle, color: 'emerald' },
-    
+
     // Financial section
     { title: 'Total Volume', value: '$12.8M', change: '+23%', icon: DollarSign, color: 'yellow' },
     { title: 'Monthly Revenue', value: '$485K', change: '+18%', icon: TrendingUp, color: 'orange' },
     { title: 'Total Transactions', value: '8,429', change: '+31%', icon: Receipt, color: 'red' },
     { title: 'Pending Payouts', value: '$127K', change: '-5%', icon: Clock, color: 'amber' },
-    
+
     // Analytics section
     { title: 'Growth Rate', value: '+23.5%', change: '+5%', icon: BarChart3, color: 'purple' },
     { title: 'Avg. Savings', value: '$4,250', change: '+12%', icon: PieChart, color: 'pink' },
     { title: 'Success Rate', value: '96.8%', change: '+1%', icon: Activity, color: 'blue' },
     { title: 'User Engagement', value: '78.9%', change: '+7%', icon: TrendingUp, color: 'indigo' },
-    
+
     // Notifications section
     { title: 'Active Campaigns', value: '24', change: '+3%', icon: Bell, color: 'violet' },
     { title: 'Delivery Rate', value: '98.2%', change: '+0.5%', icon: CheckCircle, color: 'emerald' },
     { title: 'Open Rate', value: '67.4%', change: '+8%', icon: Eye, color: 'blue' },
     { title: 'Click Rate', value: '12.8%', change: '+15%', icon: ArrowUp, color: 'green' },
-    
+
     // Security section
     { title: 'Security Score', value: '98.5%', change: '+1%', icon: Shield, color: 'green' },
     { title: 'Failed Logins', value: '23', change: '-12%', icon: Lock, color: 'red' },
@@ -116,7 +137,7 @@ export default function Home() {
         <div className="mb-8 flex items-center justify-between border-b border-[#00000008] pb-4">
           <div>
             <h2 className="text-2xl font-light text-[#1E1E1E]">
-              Welcome back, Oke
+              Welcome back, {user?.fullName?.split(' ')[0] || 'Admin'}
             </h2>
             <p className="text-[#999999] text-xs mt-1 font-light">
               Here's what's happening with your platform today
@@ -142,7 +163,7 @@ export default function Home() {
             <h3 className="text-lg font-light text-[#1E1E1E]">Platform Overview</h3>
             <p className="text-xs text-[#999999] mt-1">Essential platform metrics at a glance</p>
           </div>
-          
+
           <div className="p-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {/* Total Users */}
@@ -154,7 +175,7 @@ export default function Home() {
                 <p className="text-xs text-[#999999] uppercase tracking-wider mb-1">Total Users</p>
                 <span className="text-xs text-emerald-600 font-medium">+12% this month</span>
               </div>
-              
+
               {/* Active Groups */}
               <div className="text-center">
                 <div className="w-12 h-12 bg-emerald-50/50 border border-emerald-100 flex items-center justify-center mx-auto mb-3">
@@ -164,7 +185,7 @@ export default function Home() {
                 <p className="text-xs text-[#999999] uppercase tracking-wider mb-1">Active Groups</p>
                 <span className="text-xs text-emerald-600 font-medium">+8% this month</span>
               </div>
-              
+
               {/* Monthly Revenue */}
               <div className="text-center">
                 <div className="w-12 h-12 bg-amber-50/50 border border-amber-100 flex items-center justify-center mx-auto mb-3">
@@ -174,7 +195,7 @@ export default function Home() {
                 <p className="text-xs text-[#999999] uppercase tracking-wider mb-1">Monthly Revenue</p>
                 <span className="text-xs text-emerald-600 font-medium">+18% this month</span>
               </div>
-              
+
               {/* Platform Health */}
               <div className="text-center">
                 <div className="w-12 h-12 bg-green-50/50 border border-green-100 flex items-center justify-center mx-auto mb-3">

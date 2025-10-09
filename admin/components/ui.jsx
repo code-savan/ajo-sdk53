@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronDown, User, Settings, LogOut, AlertTriangle } from "lucide-react";
 import { useMemo, useState, useRef, useEffect, createContext, useContext } from "react";
 import Link from "next/link";
+import { useAuth } from "../contexts/AuthContext";
 
 // Create logout context
 const LogoutContext = createContext({
@@ -14,11 +15,11 @@ const LogoutContext = createContext({
 
 export function LogoutProvider({ children }) {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const router = useRouter();
+  const { signOut } = useAuth();
 
   const handleLogout = () => {
     console.log('Logging out...');
-    router.push('/login');
+    signOut();
   };
 
   return (
@@ -80,6 +81,18 @@ export function PageHeader({ title, actions }) {
   const pathname = usePathname();
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const { setShowLogoutModal } = useLogout();
+  const { user } = useAuth();
+  const [cachedProfile, setCachedProfile] = useState(null);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && user?.id) {
+        const cacheKey = `admin_profile_${user.id}`;
+        const raw = window.sessionStorage.getItem(cacheKey) || window.localStorage.getItem(cacheKey);
+        if (raw) setCachedProfile(JSON.parse(raw));
+      }
+    } catch (_) {}
+  }, [user?.id]);
   const dropdownRef = useRef(null);
 
   // Close dropdown when clicking outside
@@ -180,13 +193,13 @@ export function PageHeader({ title, actions }) {
             onClick={() => setShowProfileDropdown(!showProfileDropdown)}
           >
             <img
-              src="https://api.dicebear.com/9.x/adventurer/svg?seed=Admin"
+              src={cachedProfile?.avatar || "https://api.dicebear.com/9.x/adventurer/svg?seed=Admin"}
               alt="Admin avatar"
               className="w-8 h-8 rounded-full border border-[#00000008]"
             />
             <div className="hidden sm:block">
-              <p className="text-[13px] font-light text-[#1E1E1E]">Iren Kukoma</p>
-              <p className="text-[11px] text-[#999999] font-light">Super Admin</p>
+              <p className="text-[13px] font-light text-[#1E1E1E]">{cachedProfile?.name || user?.fullName || 'Admin User'}</p>
+              <p className="text-[11px] text-[#999999] font-light">{cachedProfile?.email || user?.email || ''}</p>
             </div>
             <ChevronDown className={`w-4 h-4 text-[#666666] ml-1 transition-transform duration-200 ${showProfileDropdown ? 'rotate-180' : ''}`} strokeWidth={1.5} />
           </div>

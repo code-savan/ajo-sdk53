@@ -4,6 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Users, UserSquare2, CircleDollarSign, PieChart, Bell, Settings, Headphones, Lock, Shield, LogOut } from "lucide-react";
 import { useLogout } from "./ui";
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 
 const mainMenu = [
   { name: "Overview", href: "/", icon: Home },
@@ -24,6 +27,18 @@ const supportMenu = [
 export default function Sidebar({ isOpen = false, onClose = () => {} }) {
   const pathname = usePathname();
   const { setShowLogoutModal } = useLogout();
+  const { user } = useAuth();
+  const [cachedProfile, setCachedProfile] = useState(null);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && user?.id) {
+        const cacheKey = `admin_profile_${user.id}`;
+        const raw = window.sessionStorage.getItem(cacheKey) || window.localStorage.getItem(cacheKey);
+        if (raw) setCachedProfile(JSON.parse(raw));
+      }
+    } catch (_) {}
+  }, [user?.id]);
 
   const NavList = ({ items }) => (
     <div className="space-y-1">
@@ -35,8 +50,8 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
             key={item.name}
             href={item.href}
             className={`sidebar-link flex items-center rounded-lg px-4 py-3 transition-all duration-200 group ${
-              isActive 
-                ? "sidebar-link-active bg-[#DDE8FF] text-[#1E1E1E] border-l-2 border-blue-500" 
+              isActive
+                ? "sidebar-link-active bg-[#DDE8FF] text-[#1E1E1E] border-l-2 border-blue-500"
                 : "hover:bg-[#F8F9FA] hover:border-l-2 hover:border-gray-300 text-[#1E1E1E]"
             }`}
           >
@@ -55,11 +70,11 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex md:flex-col justify-between w-[306px] h-screen fixed top-0 left-0 bg-white/80 backdrop-blur-sm border-r border-[#00000008] shadow-sm">
         <div className="h-16 flex items-center px-6 border-b border-[#00000008]">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-violet-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-semibold text-sm">A</span>
+          <div className="flex items-center  cursor-pointer">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-violet-600 rounded-lg flex items-center justify-center">
+              <Image src="/whitebg.jpeg" alt="Ajo Pay Logo" width={48} height={48} />
             </div>
-            <div className="text-[18px] font-light text-[#1E1E1E]">Ajo Admin</div>
+            <div className="text-[18px] font-light text-[#1E1E1E]">Ajo Pay Admin</div>
           </div>
         </div>
 
@@ -79,13 +94,13 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <img
-                src="https://api.dicebear.com/9.x/adventurer/svg?seed=Admin"
+                src={cachedProfile?.avatar || "https://api.dicebear.com/9.x/adventurer/svg?seed=Admin"}
                 alt="Admin avatar"
                 className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
               />
               <div className="ml-3">
-                <p className="text-[14px] font-light text-[#1E1E1E]">Iren Kukoma</p>
-                <p className="text-[11px] text-[#999999] font-light">Super Admin</p>
+                <p className="text-[14px] font-light text-[#1E1E1E]">{cachedProfile?.name || user?.fullName || 'Admin User'}</p>
+                <p className="text-[11px] text-[#999999] font-light">{cachedProfile?.email || user?.email || ''}</p>
               </div>
             </div>
             <button
