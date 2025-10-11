@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronDown, User, Settings, LogOut, AlertTriangle } from "lucide-react";
 import { useMemo, useState, useRef, useEffect, createContext, useContext } from "react";
 import Link from "next/link";
+import { isPathAllowed } from "../lib/accessControl";
 import { useAuth } from "../contexts/AuthContext";
 
 // Create logout context
@@ -155,6 +156,9 @@ export function PageHeader({ title, actions }) {
 
   const displayTitle = derivedTitle || title || "";
 
+  const role = (cachedProfile?.role || user?.role);
+  const canSeeSettings = isPathAllowed(role, '/settings');
+
   return (
     <header className="h-16 bg-white/80 backdrop-blur-sm border-b border-[#00000008] flex items-center justify-between px-4 sm:px-6 fixed top-0 left-[306px] w-[calc(100%-306px)] z-30 shadow-sm">
       <div className="flex items-center gap-4">
@@ -215,14 +219,16 @@ export function PageHeader({ title, actions }) {
                 <User className="w-4 h-4 text-[#666666]" strokeWidth={1.5} />
                 Profile
               </Link>
-              <Link
-                href="/settings"
-                className="flex items-center gap-3 px-4 py-2 text-sm text-[#1E1E1E] hover:bg-[#F8F9FA] transition-colors"
-                onClick={() => setShowProfileDropdown(false)}
-              >
-                <Settings className="w-4 h-4 text-[#666666]" strokeWidth={1.5} />
-                Settings
-              </Link>
+              {canSeeSettings && (
+                <Link
+                  href="/settings"
+                  className="flex items-center gap-3 px-4 py-2 text-sm text-[#1E1E1E] hover:bg-[#F8F9FA] transition-colors"
+                  onClick={() => setShowProfileDropdown(false)}
+                >
+                  <Settings className="w-4 h-4 text-[#666666]" strokeWidth={1.5} />
+                  Settings
+                </Link>
+              )}
               <hr className="my-2 border-[#00000008]" />
               <button
                 className="flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors w-full text-left"

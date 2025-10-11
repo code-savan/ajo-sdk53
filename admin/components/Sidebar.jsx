@@ -7,6 +7,7 @@ import { useLogout } from "./ui";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { isPathAllowed } from "../lib/accessControl";
 
 const mainMenu = [
   { name: "Overview", href: "/", icon: Home },
@@ -20,7 +21,6 @@ const mainMenu = [
 ];
 
 const supportMenu = [
-  { name: "Settings", href: "/settings", icon: Settings },
   { name: "Help & Support", href: "/help", icon: Headphones },
 ];
 
@@ -40,9 +40,17 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
     } catch (_) {}
   }, [user?.id]);
 
+  const role = (cachedProfile?.role || user?.role);
+
+  const filterByRole = (items) => {
+    try {
+      return items.filter((item) => isPathAllowed(role, item.href));
+    } catch (_) { return items; }
+  };
+
   const NavList = ({ items }) => (
     <div className="space-y-1">
-      {items.map((item) => {
+      {filterByRole(items).map((item) => {
         const isActive = pathname === item.href || (item.href === "/" && pathname === "/") || pathname.startsWith(item.href + '/');
         const Icon = item.icon;
         return (

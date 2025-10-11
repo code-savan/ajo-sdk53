@@ -7,6 +7,7 @@ import { LogoutProvider } from "../components/ui";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
 import SessionStatus from "../components/SessionStatus";
+import RouteGuard from "../components/RouteGuard";
 
 import { usePathname } from "next/navigation";
 
@@ -39,13 +40,15 @@ function AppContent({ children }) {
   return (
     <LogoutProvider>
       <SidebarProvider>
-        <div className="min-h-screen flex">
-          <Sidebar />
-          <div className="flex-1 flex flex-col overflow-hidden md:pl-[306px]">
-            {children}
-            <SessionStatus />
+        <RouteGuard>
+          <div className="min-h-screen flex">
+            <Sidebar />
+            <div className="flex-1 flex flex-col overflow-hidden md:pl-[306px]">
+              {children}
+              <SessionStatus />
+            </div>
           </div>
-        </div>
+        </RouteGuard>
       </SidebarProvider>
     </LogoutProvider>
   );

@@ -93,6 +93,27 @@ export default function ProfilePage() {
     return String(role).replace(/\b\w/g, c => c.toUpperCase());
   };
 
+  const normalizeRoleKey = (role) => {
+    const r = String(role || '').toLowerCase();
+    if (r === 'super admin') return 'super_admin';
+    if (r === 'customer support') return 'support';
+    if (r === 'compliance officer') return 'compliance';
+    if (r === 'analyst') return 'analyst';
+    if (r === 'admin') return 'admin';
+    return 'admin';
+  };
+
+  const roleBadgeClass = (roleKey) => {
+    switch (roleKey) {
+      case 'super_admin': return 'bg-red-50 text-red-600 border-red-100';
+      case 'admin': return 'bg-blue-50 text-blue-600 border-blue-100';
+      case 'support': return 'bg-green-50 text-green-600 border-green-100';
+      case 'analyst': return 'bg-purple-50 text-purple-600 border-purple-100';
+      case 'compliance': return 'bg-amber-50 text-amber-700 border-amber-100';
+      default: return 'bg-gray-50 text-gray-600 border-gray-100';
+    }
+  };
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -282,7 +303,7 @@ export default function ProfilePage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h1 className="text-2xl font-light text-[#1E1E1E]">{profile.name}</h1>
-                    <span className="px-3 py-1 bg-violet-50 text-violet-600 text-xs font-medium border border-violet-100 rounded-full">
+                    <span className={`px-3 py-1 text-xs font-medium border rounded-full ${roleBadgeClass(normalizeRoleKey(profile.role))}`}>
                       {formatRole(profile.role)}
                     </span>
                   </div>

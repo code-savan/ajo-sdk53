@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "../lib/supabase";
+import { getFirstAllowedPath } from "../lib/accessControl";
 
 const AuthContext = createContext();
 
@@ -25,11 +26,19 @@ export function AuthProvider({ children }) {
         }
 
         if (session?.user) {
+          let cachedRole = undefined;
+          try {
+            if (typeof window !== 'undefined') {
+              const cacheKey = `admin_profile_${session.user.id}`;
+              const raw = window.sessionStorage.getItem(cacheKey) || window.localStorage.getItem(cacheKey);
+              if (raw) cachedRole = JSON.parse(raw)?.role;
+            }
+          } catch (_) {}
           const userData = {
             id: session.user.id,
             email: session.user.email,
             fullName: session.user.user_metadata?.full_name || 'Admin User',
-            role: 'admin',
+            role: cachedRole || 'admin',
             organization: 'AJO Platform',
             lastLogin: null,
             permissions: {},
@@ -61,11 +70,19 @@ export function AuthProvider({ children }) {
               body: JSON.stringify({ user_id: session.user.id, last_login: new Date().toISOString() })
             });
           } catch (_) {}
+          let cachedRole = undefined;
+          try {
+            if (typeof window !== 'undefined') {
+              const cacheKey = `admin_profile_${session.user.id}`;
+              const raw = window.sessionStorage.getItem(cacheKey) || window.localStorage.getItem(cacheKey);
+              if (raw) cachedRole = JSON.parse(raw)?.role;
+            }
+          } catch (_) {}
           const userData = {
             id: session.user.id,
             email: session.user.email,
             fullName: session.user.user_metadata?.full_name || 'Admin User',
-            role: 'admin',
+            role: cachedRole || 'admin',
             organization: 'AJO Platform',
             lastLogin: null,
             permissions: {},
@@ -79,15 +96,25 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Redirect logic based on auth state (do not force onboarding; onboarding handles its own redirect)
+  // Redirect logic based on auth state (send to first allowed route on login)
   useEffect(() => {
     if (!isLoading) {
       const isAuthPage = pathname?.startsWith("/auth");
       if (!user && !isAuthPage) {
         router.push("/auth/signin");
       } else if (user && isAuthPage) {
-        // Once signed-in, send to main page; onboarding will only be used in signup flow
-        router.push("/");
+        // Send to first allowed route for role to avoid redirect loops
+        let cachedRole = undefined;
+        try {
+          if (typeof window !== 'undefined' && user?.id) {
+            const cacheKey = `admin_profile_${user.id}`;
+            const raw = window.sessionStorage.getItem(cacheKey) || window.localStorage.getItem(cacheKey);
+            if (raw) cachedRole = JSON.parse(raw)?.role;
+          }
+        } catch (_) {}
+        const effectiveRole = cachedRole || user.role || 'admin';
+        const destination = getFirstAllowedPath(effectiveRole);
+        router.replace(destination || "/");
       }
     }
   }, [user, isLoading, pathname, router]);
