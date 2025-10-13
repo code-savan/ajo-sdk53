@@ -7,6 +7,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import BottomNavigation from '../../components/BottomNavigation';
 import { apiGet } from '../../lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function GroupsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -15,22 +16,36 @@ export default function GroupsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [activeCount, setActiveCount] = useState<number>(0);
   const [pickupCount, setPickupCount] = useState<number>(0);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
 
   useEffect(() => {
-    const load = async () => {
+    const CACHE_KEY = 'groups_cache_v1';
+    const load = async (fromFocus = false) => {
       try {
-        setLoading(true);
+        if (!fromFocus) {
+          const cached = await AsyncStorage.getItem(CACHE_KEY);
+          if (cached) {
+            const grp = JSON.parse(cached);
+            if (Array.isArray(grp)) {
+              setGroups(grp);
+              let act = grp.filter((g: any) => g?.status === 'active').length;
+              if (act === 0 && grp.some((g: any) => g?.status === undefined)) act = grp.length;
+              setActiveCount(act);
+            }
+            setLoading(false);
+          }
+        }
+        if (!fromFocus && groups.length === 0) setLoading(true); else setRefreshing(true);
         const [groupData, txns] = await Promise.all([
           apiGet<any[]>('/api/groups').catch(() => []),
           apiGet<any[]>('/api/me/transactions?limit=500').catch(() => []),
         ]);
         const grp = Array.isArray(groupData) ? groupData : [];
         setGroups(grp);
-        // Active groups: prefer explicit status === 'active'; fall back to total length if statuses are absent
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(grp)).catch(()=>{});
         let act = grp.filter((g: any) => g?.status === 'active').length;
         if (act === 0 && grp.some((g: any) => g?.status === undefined)) act = grp.length;
         setActiveCount(act);
-        // Times collected: count rotation_earning credits
         const t = Array.isArray(txns) ? txns : [];
         const pickups = t.filter((r: any) => r?.source === 'rotation_earning' && r?.direction === 'credit').length;
         setPickupCount(pickups);
@@ -38,10 +53,11 @@ export default function GroupsScreen() {
         setError('Failed to load groups');
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     };
-    const unsubscribe = navigation.addListener('focus', load);
-    load();
+    const unsubscribe = navigation.addListener('focus', () => load(true));
+    load(false);
     return unsubscribe;
   }, [navigation]);
 
@@ -89,14 +105,29 @@ export default function GroupsScreen() {
         <View style={styles.content}>
           {/* Stats Row */}
           <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statTop}>Your total active groups{"\n"}at a glance.</Text>
-              <Text style={styles.statValue}>{formatStat(activeCount)}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statTop}>Total times you have{"\n"}collected.</Text>
-              <Text style={styles.statValue}>{formatStat(pickupCount)}</Text>
-            </View>
+            {loading && groups.length === 0 ? (
+              <>
+                <View style={styles.statCard}>
+                  <View style={styles.skelBarMedium} />
+                  <View style={styles.skelBigNumber} />
+                </View>
+                <View style={styles.statCard}>
+                  <View style={styles.skelBarMedium} />
+                  <View style={styles.skelBigNumber} />
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.statCard}>
+                  <Text style={styles.statTop}>Your total active groups{"\n"}at a glance.</Text>
+                  <Text style={styles.statValue}>{formatStat(activeCount)}</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statTop}>Total times you have{"\n"}collected.</Text>
+                  <Text style={styles.statValue}>{formatStat(pickupCount)}</Text>
+                </View>
+              </>
+            )}
           </View>
 
           {/* Create Group Button */}
@@ -113,8 +144,20 @@ export default function GroupsScreen() {
             <Text style={styles.groupsTitle}>Groups</Text>
             <Text style={styles.groupsDescription}>Take a look at your current groups.</Text>
 
-            {loading ? (
-              <ActivityIndicator style={{ marginTop: 16 }} />
+            {loading && groups.length === 0 ? (
+              <View style={{ marginTop: 16 }}>
+                {[1,2,3].map(i => (
+                  <View key={i} style={[styles.groupItem, { borderColor: '#E5E7EB' }]}>
+                    <View style={styles.groupContent}>
+                      <View style={styles.groupIcon}><View style={styles.groupIconBg} /></View>
+                      <View style={{ flex: 1 }}>
+                        <View style={styles.skelBarLong} />
+                        <View style={[styles.skelBarShort, { marginTop: 8 }]} />
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
             ) : error ? (
               <Text style={styles.emptyText}>{error}</Text>
             ) : groups.length === 0 ? (
@@ -224,6 +267,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     alignSelf: 'flex-end',
   },
+  skelBarMedium: { width: '70%', height: 14, backgroundColor: '#E5E7EB', borderRadius: 6 },
+  skelBigNumber: { width: 64, height: 40, backgroundColor: '#E5E7EB', borderRadius: 6, alignSelf: 'flex-end', marginTop: 12 },
   createGroupButton: {
     backgroundColor: '#000000',
     borderRadius: 12,
@@ -305,6 +350,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 8,
   },
+  skelBarLong: { width: '60%', height: 12, backgroundColor: '#E5E7EB', borderRadius: 6 },
+  skelBarShort: { width: '40%', height: 10, backgroundColor: '#E5E7EB', borderRadius: 6 },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',

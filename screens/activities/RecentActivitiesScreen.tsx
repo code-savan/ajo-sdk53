@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ChevronDown } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
+import { apiGet } from '../../lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RecentActivitiesScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -12,18 +14,45 @@ type RecentActivitiesScreenNavigationProp = StackNavigationProp<RootStackParamLi
 const femaleAvatarUrl = "https://images.unsplash.com/photo-1543085784-0b3c85b4e8ac?q=80&w=987";
 const maleAvatarUrl = "https://images.unsplash.com/photo-1614248793396-944d024ec422?q=80&w=1064";
 
+type RouteP = RouteProp<RootStackParamList, 'RecentActivities'>;
+
 export default function RecentActivitiesScreen() {
   const navigation = useNavigation<RecentActivitiesScreenNavigationProp>();
+  const route = useRoute<RouteP>();
+  const groupId = (route.params as any)?.groupId;
+  const groupName = (route.params as any)?.groupName;
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const handleGoBack = () => {
     navigation.goBack();
   };
-  
-  const handleActivityPress = (person: string, type: string, amount: string) => {
-    navigation.navigate('ActivityDetail', {
-      activity: { person, type, amount }
-    });
+
+  const handleActivityPress = (activity: any) => {
+    navigation.navigate('ActivityDetail', { activity });
   };
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const CACHE_KEY = `group_activities_all_${groupId}`;
+        // Try cache first
+        const cached = await AsyncStorage.getItem(CACHE_KEY);
+        if (cached) {
+          try { setActivities(JSON.parse(cached)); } catch {}
+          setLoading(false);
+        } else {
+          setLoading(true);
+        }
+        // Refresh in background
+        const res = await apiGet(`/api/groups/${groupId}/activities?limit=50`).catch(()=>[]);
+        const arr = Array.isArray(res) ? res : [];
+        setActivities(arr);
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(arr)).catch(()=>{});
+      } finally { setLoading(false); }
+    };
+    load();
+  }, [groupId]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -40,71 +69,48 @@ export default function RecentActivitiesScreen() {
         <Text style={styles.title}>Recent activities</Text>
           <Text style={styles.subtitle}>Here are your recent activities across your group.</Text>
 
-          {/* Debbie - First transaction */}
-          <TouchableOpacity 
-            style={styles.activityItem}
-            onPress={() => handleActivityPress('Debbie', 'deposit', '100')}
-          >
-            <Image source={{ uri: femaleAvatarUrl }} style={styles.avatar} />
-            <View style={styles.activityInfo}>
-              <Text style={styles.personName}>Debbie</Text>
-              <Text style={styles.actionText}>Deposited</Text>
+          {loading ? (
+            <View>
+              {[1,2,3,4,5].map(i => (
+                <View key={i} style={styles.activityItem}>
+                  <View style={styles.avatar}><View style={{flex:1,backgroundColor:'#E5E7EB',borderRadius:24}} /></View>
+                  <View style={styles.activityInfo}>
+                    <View style={{ width: 140, height: 14, backgroundColor: '#E5E7EB', borderRadius: 6, marginBottom: 6 }} />
+                    <View style={{ width: 100, height: 12, backgroundColor: '#E5E7EB', borderRadius: 6 }} />
+                  </View>
+                  <View style={styles.amountInfo}>
+                    <View style={{ width: 90, height: 14, backgroundColor: '#E5E7EB', borderRadius: 6, marginBottom: 6 }} />
+                    <View style={{ width: 80, height: 12, backgroundColor: '#E5E7EB', borderRadius: 6 }} />
+                  </View>
+                </View>
+              ))}
             </View>
-            <View style={styles.amountInfo}>
-              <Text style={styles.amountPositive}>$100.0</Text>
-              <Text style={styles.timeText}>12:45pm</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Debbie - Second transaction */}
-          <TouchableOpacity 
-            style={styles.activityItem}
-            onPress={() => handleActivityPress('Debbie', 'deposit', '100')}
-          >
-            <Image source={{ uri: femaleAvatarUrl }} style={styles.avatar} />
-            <View style={styles.activityInfo}>
-              <Text style={styles.personName}>Debbie</Text>
-              <Text style={styles.actionText}>Deposited</Text>
-            </View>
-            <View style={styles.amountInfo}>
-              <Text style={styles.amountPositive}>$100.0</Text>
-              <Text style={styles.timeText}>12:45pm</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Angus transaction */}
-          <TouchableOpacity 
-            style={styles.activityItem}
-            onPress={() => handleActivityPress('Angus', 'collection', '1500')}
-          >
-            <Image source={{ uri: maleAvatarUrl }} style={styles.avatar} />
-            <View style={styles.activityInfo}>
-              <Text style={styles.personName}>Angus</Text>
-              <Text style={styles.actionText}>Collected</Text>
-            </View>
-            <View style={styles.amountInfo}>
-              <Text style={styles.amountPositive}>$1500</Text>
-              <Text style={styles.timeText}>1/6/2025</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* System deposit transaction */}
-          <TouchableOpacity 
-            style={styles.activityItem}
-            onPress={() => handleActivityPress('System', 'deposit', '100')}
-          >
-            <View style={styles.circleIcon}>
-              <ChevronDown color="#4D4845" size={24} />
-            </View>
-            <View style={styles.activityInfo}>
-              <Text style={styles.personName}>Deposit</Text>
-              <Text style={styles.actionText}>Contribution</Text>
-            </View>
-            <View style={styles.amountInfo}>
-              <Text style={styles.amountNegative}>$100.0</Text>
-              <Text style={styles.timeText}>12:45pm</Text>
-            </View>
-          </TouchableOpacity>
+          ) : activities.length === 0 ? (
+            <Text style={styles.subtitle}>No recent activities yet.</Text>
+          ) : (
+            activities.map((a, idx) => {
+              const isCredit = String(a.direction) === 'credit'
+              const amountStr = (Number(a.amount_cents || 0)/100).toLocaleString('en-US',{ style:'currency', currency: (a.currency||'USD').toUpperCase() })
+              const timeStr = new Date(a.occurred_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+              const subtitle = a.source === 'deposit' ? 'Deposited' : (a.source === 'rotation_payout' ? 'Collected' : (isCredit ? 'Credited' : 'Debited'))
+              const avatar = a.avatar_url || femaleAvatarUrl
+              const name = a.person_name || 'Member'
+              const payload = { person: name, avatar_url: avatar, type: subtitle.toLowerCase().includes('collect') ? 'collection' : 'deposit', amount_cents: a.amount_cents, currency: a.currency, occurred_at: a.occurred_at, source: a.source, direction: a.direction, group_name: groupName }
+              return (
+                <TouchableOpacity key={idx} style={styles.activityItem} onPress={() => handleActivityPress(payload)}>
+                  <Image source={{ uri: avatar }} style={styles.avatar} />
+                  <View style={styles.activityInfo}>
+                    <Text style={styles.personName}>{name}</Text>
+                    <Text style={styles.actionText}>{subtitle}</Text>
+                  </View>
+                  <View style={styles.amountInfo}>
+                    <Text style={styles.amountPositive}>{amountStr}</Text>
+                    <Text style={styles.timeText}>{timeStr}</Text>
+                  </View>
+                </TouchableOpacity>
+              )
+            })
+          )}
 
         </View>
       </ScrollView>

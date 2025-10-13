@@ -120,3 +120,21 @@ CREATE TABLE IF NOT EXISTS payouts (
 CREATE INDEX IF NOT EXISTS idx_payouts_group ON payouts(group_id);
 CREATE INDEX IF NOT EXISTS idx_payouts_cycle ON payouts(group_id, cycle_number);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_payouts_pi ON payouts(stripe_payment_intent_id);
+
+-- Group Invites (No RLS)
+CREATE TABLE IF NOT EXISTS group_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  invite_code TEXT NOT NULL UNIQUE DEFAULT gen_random_uuid()::text,
+  invited_by TEXT NOT NULL,
+  invited_email TEXT,
+  invited_phone TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined','expired')),
+  expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '7 days'),
+  accepted_by TEXT,
+  accepted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_invites_group ON group_invites(group_id);
+CREATE INDEX IF NOT EXISTS idx_group_invites_status ON group_invites(status);

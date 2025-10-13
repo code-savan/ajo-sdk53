@@ -71,3 +71,21 @@ export async function apiPost<T = any>(path: string, payload?: any): Promise<T> 
   const body = await res.json().catch(()=> ({}))
   return (body as any)?.data ?? body
 }
+
+export async function apiPut<T = any>(path: string, payload?: any): Promise<T> {
+  const jwt = await getBackendJWT()
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+    },
+    body: payload ? JSON.stringify(payload) : undefined,
+  })
+  if (!res.ok && res.status !== 304) {
+    const txt = await res.text().catch(()=> '')
+    throw new Error(txt || `PUT ${path} failed: ${res.status}`)
+  }
+  const body = await res.json().catch(()=> ({}))
+  return (body as any)?.data ?? body
+}

@@ -16,17 +16,17 @@ const maleAvatarUrl = "https://images.unsplash.com/photo-1614248793396-944d024ec
 export default function ActivityDetailScreen() {
   const navigation = useNavigation<ActivityDetailNavigationProp>();
   const route = useRoute<ActivityDetailRouteProps>();
-  const { activity } = route.params;
+  const { activity } = route.params as any;
 
   const handleGoBack = () => {
     navigation.goBack();
   };
 
   // Determine if this is a collection or deposit
-  const isCollection = activity.type === 'collection';
+  const isCollection = activity?.type === 'collection';
 
   // Choose the correct avatar based on the person
-  const avatarUrl = activity.person === 'Debbie' ? femaleAvatarUrl : maleAvatarUrl;
+  const avatarUrl = activity?.avatar_url || (activity?.person === 'Debbie' ? femaleAvatarUrl : maleAvatarUrl);
 
   // Set the correct badge text
   const badgeText = isCollection ? 'Collection' : 'Group funded';
@@ -35,10 +35,10 @@ export default function ActivityDetailScreen() {
   const amountLabel = isCollection ? 'Collection amount' : 'Contribution amount';
 
   // Format the amount
-  const formattedAmount = isCollection ? '$1500' : '$100';
+  const formattedAmount = (Number(activity?.amount_cents || 0)/100).toLocaleString('en-US',{ style:'currency', currency: (activity?.currency || 'USD').toUpperCase() });
 
   // Format the total amount
-  const totalAmount = isCollection ? '$1500.00' : '$100.00';
+  const totalAmount = formattedAmount;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -81,12 +81,12 @@ export default function ActivityDetailScreen() {
 
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Group name</Text>
-              <Text style={styles.detailValue}>Hawaii Vacation</Text>
+              <Text style={styles.detailValue}>{activity.group_name || 'Group'}</Text>
             </View>
 
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Date contributed</Text>
-              <Text style={styles.detailValue}>12/05/25</Text>
+              <Text style={styles.detailValue}>{activity.occurred_at ? new Date(activity.occurred_at).toLocaleString() : ''}</Text>
             </View>
           </View>
 

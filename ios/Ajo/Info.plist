@@ -28,6 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>com.codesavan.ajo</string>
+          <string>ajo</string>
         </array>
       </dict>
     </array>

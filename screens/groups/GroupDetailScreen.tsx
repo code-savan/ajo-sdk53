@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Calendar, Users, DollarSign, Pen, X, Facebook, Instagram, MessageCircle, Copy, Link2 } from 'lucide-react-native';
+import { ArrowLeft, Calendar, Users, DollarSign, Pen, X, Facebook, Instagram, MessageCircle, Copy, Link2, Clock, ChevronRight } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import Modal from 'react-native-modal';
 import { apiGet, apiPost } from '../../lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type GroupDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'GroupDetail'>;
 type GroupDetailScreenRouteProp = RouteProp<RootStackParamList, 'GroupDetail'>;
@@ -21,16 +22,24 @@ export default function GroupDetailScreen() {
   const { groupName, groupId } = route.params;
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary] = useState<any | null>(null);
   const [isBottomSheetVisible, setBottomSheetVisible] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState<boolean>(true);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [invitePhone, setInvitePhone] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
 
   const handleGoBack = () => {
     navigation.goBack();
   };
 
   const handleViewAllActivities = () => {
-    navigation.navigate('RecentActivities');
+    (navigation as any).navigate('RecentActivities' as any, { groupId, groupName } as any);
   };
 
   const handleViewAllMembers = () => {
@@ -42,7 +51,7 @@ export default function GroupDetailScreen() {
   };
 
   const handleMakeDeposit = () => {
-    navigation.navigate('MakeDeposit', { groupId, groupName });
+    (navigation as any).navigate('MakeDeposit' as any, { groupId, groupName } as any);
   };
 
   const handleActivate = async () => {
@@ -61,29 +70,75 @@ export default function GroupDetailScreen() {
 
   const handlePayContribution = async () => {
     try {
-      await apiPost(`/api/groups/${groupId}/contributions/pay`, {});
-      const data = await apiGet(`/api/groups/${groupId}/summary`);
-      setSummary(data);
-    } catch (e) {}
+      setPaying(true);
+      const res = await apiPost(`/api/groups/${groupId}/contributions/pay`, {});
+      // Optimistically bump available by contribution amount if backend returned debited_cents
+      const bumped = Number((res as any)?.debited_cents || 0);
+      if (bumped > 0) {
+        setSummary((prev: any) => prev ? { ...prev, availableBalanceCents: Number(prev.availableBalanceCents || 0) + bumped } : prev);
+      }
+      // Then refresh from server to stay accurate
+      const data = await apiGet(`/api/groups/${groupId}/summary`).catch(()=>null);
+      if (data) setSummary(data);
+    } catch (e: any) {
+      // Optionally display a toast if available in app context
+      // no toast context here; UI will remain unchanged
+    } finally { setPaying(false); }
   };
 
   useEffect(() => {
-    const load = async () => {
+    const CACHE_KEY = `group_summary_${groupId}`;
+    let unsub: any = null;
+    const load = async (fromFocus = false) => {
       try {
-        setLoading(true);
+        if (!fromFocus) {
+          // Try cache first
+          const cached = await AsyncStorage.getItem(CACHE_KEY);
+          if (cached) {
+            try { setSummary(JSON.parse(cached)); } catch {}
+            setLoading(false);
+          }
+        }
+        // Always refresh in background
+        if (!fromFocus && !summary) setLoading(true); else setRefreshing(true);
         const data = await apiGet(`/api/groups/${groupId}/summary`);
         setSummary(data);
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data)).catch(()=>{});
+        // Load recent activities (top 3)
+        try {
+          const ACT_CACHE = `group_activities_${groupId}`;
+          const cachedActs = await AsyncStorage.getItem(ACT_CACHE);
+          if (cachedActs) {
+            try { setActivities(JSON.parse(cachedActs)); } catch {}
+            setActivitiesLoading(false);
+          } else {
+            setActivitiesLoading(true);
+          }
+          const acts = await apiGet(`/api/groups/${groupId}/activities?limit=3`).catch(()=>[]);
+          const arr = Array.isArray(acts) ? acts : [];
+          setActivities(arr);
+          await AsyncStorage.setItem(ACT_CACHE, JSON.stringify(arr)).catch(()=>{});
+        } finally { setActivitiesLoading(false); }
+        // Load pending invites
+        try {
+          const inv = await apiGet(`/api/groups/${groupId}/invites?status=pending`).catch(()=>[]);
+          setPendingInvites(Array.isArray(inv?.data) ? inv.data : (Array.isArray(inv) ? inv : []));
+        } catch {}
       } catch (e) {
-        setSummary(null);
+        if (!summary) setSummary(null);
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     };
-    load();
+    load(false);
+    unsub = navigation.addListener('focus', () => load(true));
+    return () => { if (unsub) unsub(); };
   }, [groupId]);
 
   const group = summary?.group;
   const available = summary?.availableBalanceCents ?? 0;
+  const totalContributed = summary?.totalContributedCents ?? available;
   const durationMonths = summary?.duration_months ?? null;
 
   return (
@@ -99,7 +154,7 @@ export default function GroupDetailScreen() {
             </View>
             <View style={styles.groupIconContainer}>
               <View style={styles.groupIcon}>
-                <Image source={require('../../assets/images/profile.png')} style={styles.groupIconImage} />
+                <Image source={require('../../assets/images/profile.png')} style={styles.groupIconImage as any} />
               </View>
               <TouchableOpacity style={styles.editIcon}>
                 <Pen size={14} color="#ffffff" />
@@ -107,42 +162,57 @@ export default function GroupDetailScreen() {
             </View>
             <View style={styles.groupInfo}>
               <Text style={styles.groupTitle}>{groupName}</Text>
-              <View style={styles.groupStatusContainer}>
-                <Text style={styles.groupStatus}>{group?.status === 'active' ? 'Active' : 'Draft'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {/* Availability badge only */}
+                {loading ? (
+                  <View style={styles.openBadge}>
+                    <Text style={styles.openBadgeText}></Text>
+                  </View>
+                ) : (
+                  <View style={[styles.openBadge, (Number(summary?.memberCount || 0) >= Number(group?.size || 0)) ? styles.closedBadge : styles.openBadge]}>
+                    <Text style={[styles.openBadgeText, (Number(summary?.memberCount || 0) >= Number(group?.size || 0)) ? styles.closedBadgeText : styles.openBadgeText]}>
+                      {Number(summary?.memberCount || 0) >= Number(group?.size || 0) ? 'Group full' : 'Group open'}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
         </View>
 
         <View style={styles.body}>
-          {loading ? (
-            <ActivityIndicator />
+          {loading && !summary ? (
+            <View>
+              <View style={styles.skelAmount} />
+              <View style={styles.metaContainer}>
+                <View style={styles.metaItem}><View style={styles.skelIcon} /><View style={styles.skelBarSmall} /></View>
+                <View style={styles.metaItem}><View style={styles.skelIcon} /><View style={styles.skelBarSmall} /></View>
+                <View style={styles.metaItem}><View style={styles.skelIcon} /><View style={styles.skelBarSmall} /></View>
+              </View>
+            </View>
           ) : !group ? (
             <Text style={{ color: '#6B7280' }}>No data available.</Text>
           ) : (
             <>
-              <Text style={styles.amount}>{(group.goal_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(group.currency||'USD').toUpperCase()})}</Text>
+              {/* Top amount shows total contributed amount from DB */}
+              <Text style={styles.amount}>{(Number(totalContributed || 0)/100).toLocaleString('en-US',{style:'currency',currency:(group.currency||'USD').toUpperCase()})}</Text>
               <View style={styles.metaContainer}>
                 <View style={styles.metaItem}>
                   <Calendar width={16} height={16} color="#6B7280" />
-                  <Text style={styles.metaText}>{group.next_charge_at ? new Date(group.next_charge_at).toLocaleDateString() : '-'}</Text>
+                  <Text style={styles.metaText}>{group.created_at ? new Date(group.created_at).toLocaleDateString('en-US', { month: 'numeric', day: '2-digit', year: 'numeric' }) : '-'}</Text>
                 </View>
                 <View style={styles.metaItem}>
                   <Users width={16} height={16} color="#6B7280" />
-                  <Text style={styles.metaText}>{group.size}</Text>
+                  <Text style={styles.metaText}>{`${Math.max(1, Number(summary?.memberCount || 0))}/${Number(group.size || 0)}`}</Text>
                 </View>
                 <View style={styles.metaItem}>
                   <DollarSign width={16} height={16} color="#6B7280" />
-                  <Text style={styles.metaText}>{(group.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(group.currency||'USD').toUpperCase()})}</Text>
+                  <Text style={styles.metaText}>
+                    {(group.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(group.currency||'USD').toUpperCase()})} / mth
+                  </Text>
                 </View>
               </View>
 
-              <View style={{ marginTop: 8 }}>
-                <Text style={{ color: '#6B7280' }}>Available group balance: {(available/100).toLocaleString('en-US',{style:'currency',currency:(group.currency||'USD').toUpperCase()})}</Text>
-                {durationMonths ? (
-                  <Text style={{ color: '#6B7280' }}>Estimated duration: {durationMonths} months</Text>
-                ) : null}
-              </View>
             </>
           )}
         </View>
@@ -155,21 +225,92 @@ export default function GroupDetailScreen() {
           </Text>
         </View>
 
-        {/* Recent Activities (static placeholder) */}
+        {/* Recent Activities */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent activities</Text>
           <Text style={styles.sectionSubtitle}>Here are your recent activities across your group.</Text>
-          <View style={styles.activityItem}>
-            <Image source={{ uri: femaleAvatarUrl }} style={styles.avatar} />
-            <View style={styles.activityInfo}>
-              <Text style={styles.personName}>Debbie</Text>
-              <Text style={styles.actionText}>Deposited</Text>
+          {activitiesLoading ? (
+            <View style={{ paddingVertical: 16 }}>
+              {[1,2,3].map(i => (
+                <View key={i} style={styles.activityItem}>
+                  <View style={styles.avatar}><View style={{flex:1,backgroundColor:'#E5E7EB',borderRadius:20}} /></View>
+                  <View style={styles.activityInfo}>
+                    <View style={{ width: 120, height: 14, backgroundColor: '#E5E7EB', borderRadius: 6, marginBottom: 6 }} />
+                    <View style={{ width: 80, height: 12, backgroundColor: '#E5E7EB', borderRadius: 6 }} />
+                  </View>
+                  <View style={styles.amountInfo}>
+                    <View style={{ width: 72, height: 14, backgroundColor: '#E5E7EB', borderRadius: 6, marginBottom: 6 }} />
+                    <View style={{ width: 80, height: 12, backgroundColor: '#E5E7EB', borderRadius: 6 }} />
+                  </View>
+                </View>
+              ))}
             </View>
-            <View style={styles.amountInfo}>
-              <Text style={styles.amountPositive}>$100.0</Text>
-              <Text style={styles.timeText}>12:45pm</Text>
+          ) : activities.length === 0 ? (
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 32 }}>
+              <View style={{ width: 110, height: 110, borderRadius: 55, borderWidth: 2, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                <Clock width={36} height={36} color="#9CA3AF" />
+              </View>
+              <Text style={{ color: '#6B7280', textAlign: 'center' }}>You currently have no{"\n"}recent activities.</Text>
             </View>
-          </View>
+          ) : (
+            <>
+              {activities.map((a, idx) => {
+                const isCredit = String(a.direction) === 'credit'
+                const amountStr = (Number(a.amount_cents || 0)/100).toLocaleString('en-US',{ style:'currency', currency: (a.currency||'USD').toUpperCase() })
+                const timeStr = new Date(a.occurred_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                const subtitle = a.source === 'deposit' ? 'Deposited' : (a.source === 'rotation_payout' ? 'Collected' : (isCredit ? 'Credited' : 'Debited'))
+                const avatar = a.avatar_url || femaleAvatarUrl
+                const name = a.person_name || 'Member'
+                const activityPayload = {
+                  person: name,
+                  avatar_url: a.avatar_url || null,
+                  type: subtitle.toLowerCase().includes('collect') ? 'collection' : (subtitle.toLowerCase().includes('deposit') ? 'deposit' : 'other'),
+                  amount_cents: a.amount_cents,
+                  currency: a.currency,
+                  occurred_at: a.occurred_at,
+                  source: a.source,
+                  direction: a.direction,
+                  group_name: groupName,
+                }
+                return (
+                  <TouchableOpacity key={idx} style={styles.activityItem} onPress={() => (navigation as any).navigate('ActivityDetail' as any, { activity: activityPayload } as any)}>
+                    <Image source={{ uri: avatar }} style={styles.avatar} />
+                    <View style={styles.activityInfo}>
+                      <Text style={styles.personName}>{name}</Text>
+                      <Text style={styles.actionText}>{subtitle}</Text>
+                    </View>
+                    <View style={styles.amountInfo}>
+                      <Text style={[styles.amountPositive]}>{amountStr}</Text>
+                      <Text style={styles.timeText}>{timeStr}</Text>
+                    </View>
+                  </TouchableOpacity>
+                )
+              })}
+              <TouchableOpacity style={styles.viewAllButton} onPress={handleViewAllActivities}>
+                <Text style={styles.viewAllText}>View all activities</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* Group members section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Group members</Text>
+          <Text style={styles.sectionSubtitle}>Meet the members of your savings circle.</Text>
+          <TouchableOpacity style={styles.memberItem} onPress={handleViewAllMembers}>
+            <View style={styles.memberLeft}>
+              <Image source={{ uri: summary?.profile_image_url || femaleAvatarUrl }} style={styles.memberAvatar} />
+              <View style={styles.onlineIndicator} />
+            </View>
+            <View style={styles.memberInfo}>
+              <Text style={styles.memberName}>{summary?.owner_name || 'You'}</Text>
+              <Text style={styles.memberRole}>Group Admin</Text>
+            </View>
+            <ChevronRight width={18} height={18} color="#4B5563" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.invitePill} onPress={handleInviteMember}>
+            <Text style={styles.invitePillText}>Invite member</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Invite Member Bottom Sheet */}
@@ -195,6 +336,46 @@ export default function GroupDetailScreen() {
                 <Text style={styles.inviteText}>• Invite friends, family, or contacts you trust to contribute and follow through.</Text>
                 <Text style={styles.inviteText}>• Make sure you don’t exceed the group’s maximum member limit.</Text>
               </View>
+              {/* Invite form */}
+              <View style={{ gap: 8, marginBottom: 12 }}>
+                <Text style={{ fontSize: 12, color: '#3B3B3B' }}>Email</Text>
+                <View style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#EBEBEB', borderRadius: 8 }}>
+                  <TextInput
+                    style={{ paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 }}
+                    placeholder="member@example.com"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    value={inviteEmail}
+                    onChangeText={setInviteEmail}
+                  />
+                </View>
+                <Text style={{ fontSize: 12, color: '#3B3B3B' }}>Phone (optional)</Text>
+                <View style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#EBEBEB', borderRadius: 8 }}>
+                  <TextInput
+                    style={{ paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 }}
+                    placeholder="+1 555 555 5555"
+                    keyboardType="phone-pad"
+                    value={invitePhone}
+                    onChangeText={setInvitePhone}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={[styles.inviteSendButton, inviting && { opacity: 0.6 }]}
+                  onPress={async () => {
+                    try {
+                      setInviting(true);
+                      await apiPost(`/api/groups/${groupId}/invites`, { email: inviteEmail || null, phone: invitePhone || null });
+                      const inv = await apiGet(`/api/groups/${groupId}/invites?status=pending`).catch(()=>[]);
+                      setPendingInvites(Array.isArray(inv?.data) ? inv.data : (Array.isArray(inv) ? inv : []));
+                      setInviteEmail('');
+                      setInvitePhone('');
+                    } finally { setInviting(false); }
+                  }}
+                  disabled={inviting}
+                >
+                  <Text style={[styles.primaryButtonText, { color: '#fff' }]}>{inviting ? 'Sending...' : 'Send invite'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             <Text style={styles.sendInviteVia}>Send invite link via</Text>
             <View style={styles.socialIcons}>
@@ -219,22 +400,44 @@ export default function GroupDetailScreen() {
                 <Text style={styles.socialIconText}>Copy link</Text>
               </View>
             </View>
+            {/* Pending invites */}
+            <Text style={styles.sendInviteVia}>Pending invites</Text>
+            <View style={{ gap: 10 }}>
+              {pendingInvites.length === 0 ? (
+                <Text style={{ color: '#7E7E7E', fontSize: 12 }}>No pending invites.</Text>
+              ) : (
+                pendingInvites.map((inv: any) => (
+                  <View key={inv.invite_code} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderWidth: 1, borderColor: '#EBEBEB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 }}>
+                    <Text style={{ color: '#1E1E1E', fontSize: 12 }}>{inv.invited_email || inv.invited_phone || inv.invite_code}</Text>
+                    <View style={{ flexDirection: 'row' }}>
+                      <TouchableOpacity onPress={async () => {
+                        await apiPost('/api/groups/invites/revoke', { invite_code: inv.invite_code });
+                        const iv = await apiGet(`/api/groups/${groupId}/invites?status=pending`).catch(()=>[]);
+                        setPendingInvites(Array.isArray(iv?.data) ? iv.data : (Array.isArray(iv) ? iv : []));
+                      }}>
+                        <Text style={{ color: '#B91C1C', fontSize: 12 }}>Revoke</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
           </View>
         </Modal>
 
         <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.inviteMemberButton} onPress={handleInviteMember}>
+            <Text style={styles.secondaryButtonText}>Invite member</Text>
+          </TouchableOpacity>
           {group?.status === 'draft' ? (
             <TouchableOpacity style={styles.primaryButton} onPress={handleActivate}>
               <Text style={styles.primaryButtonText}>{activating ? 'Activating...' : 'Activate group'}</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={styles.primaryButton} onPress={handlePayContribution}>
-              <Text style={styles.primaryButtonText}>Pay contribution</Text>
+            <TouchableOpacity style={[styles.primaryButton, paying && { opacity: 0.6 }]} onPress={handlePayContribution} disabled={paying}>
+              <Text style={styles.primaryButtonText}>{paying ? 'Processing…' : 'Make a deposit'}</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleInviteMember}>
-            <Text style={styles.secondaryButtonText}>Invite</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -245,7 +448,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    postion: "relative"
+    position: "relative"
   },
   headerContainer: {
     // zIndex: 1,
@@ -342,7 +545,7 @@ const styles = StyleSheet.create({
   },
   groupInfo: {
     alignItems: 'flex-end',
-    justifyContent: "end",
+    justifyContent: 'flex-end',
     position: "absolute",
     right: 15,
     top: 150,
@@ -353,6 +556,22 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8
+  },
+  openBadge: {
+    backgroundColor: '#E7F8EE',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  openBadgeText: {
+    color: '#0B7A38',
+    fontSize: 12,
+  },
+  closedBadge: {
+    backgroundColor: '#FFE4E6',
+  },
+  closedBadgeText: {
+    color: '#B91C1C',
   },
   groupTitle: {
     fontSize: 20,
@@ -374,9 +593,12 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     marginBottom: 16,
   },
+  skelAmount: { width: 160, height: 24, backgroundColor: '#E5E7EB', borderRadius: 6, marginBottom: 16 },
+  skelIcon: { width: 16, height: 16, backgroundColor: '#E5E7EB', borderRadius: 8 },
+  skelBarSmall: { width: 80, height: 12, backgroundColor: '#E5E7EB', borderRadius: 6 },
   metaContainer: {
     flexDirection: 'row',
-    justifyContent: 'start',
+    justifyContent: 'flex-start',
     gap: 24,
     marginBottom: 32,
     // paddingHorizontal: 24,
@@ -539,7 +761,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     alignItems: 'center',
     marginTop: 16,
-    alignSelf: 'start',
+    alignSelf: 'flex-start',
   },
   viewAllText: {
     fontSize: 12,
@@ -568,6 +790,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '400',
     color: '#1E1E1E',
+  },
+  invitePill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 12
+  },
+  invitePillText: {
+    color: '#4B5563',
+    fontSize: 14,
   },
   depositButton: {
     flex: 1,
@@ -641,14 +875,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#3B3B3B',
     textAlign: 'left',
-    fontWeight: "400",
-    marginBottom: 15
+    fontWeight: "500",
+    marginBottom: 12,
+    marginTop: 12
   },
   socialIcons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     // paddingHorizontal: 8,
-    paddingVertical: 15
+    paddingBottom: 15
   },
   socialIconContainer: {
     alignItems: 'center',
@@ -680,9 +915,19 @@ const styles = StyleSheet.create({
   primaryButton: {
     flex: 1,
     backgroundColor: '#000000',
-    borderRadius: 25,
+    borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteSendButton: {
+    flex: 1,
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // height: 32,
   },
   primaryButtonText: {
     fontSize: 12,
@@ -695,6 +940,15 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  inviteMemberButton: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
   },
   secondaryButtonText: {
     fontSize: 12,

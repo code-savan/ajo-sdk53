@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiGet, apiPut } from '../../lib/api';
+import { useToast } from '../../contexts/ToastContext';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 // Define navigation prop types
@@ -40,6 +43,8 @@ const TwoFactorAuthScreen: React.FC<TwoFactorAuthScreenProps> = ({ navigation })
   const [securityAnswer, setSecurityAnswer] = useState('');
   const [savedQuestion, setSavedQuestion] = useState('');
   const [savedAnswer, setSavedAnswer] = useState('');
+  const [saving, setSaving] = useState(false);
+  const { showToast } = useToast();
 
   // Get screen dimensions for modal sizing
   const { height: screenHeight } = Dimensions.get('window');
@@ -48,13 +53,43 @@ const TwoFactorAuthScreen: React.FC<TwoFactorAuthScreenProps> = ({ navigation })
     navigation.goBack();
   };
 
-  const toggleTfa = () => {
-    setTfaEnabled((previousState) => !previousState);
-    // If disabling 2FA, also reset the security question and answer
-    if (tfaEnabled) {
+  useEffect(() => {
+    const load = async () => {
+      const cached = await AsyncStorage.getItem('profile_cache_v1');
+      if (cached) {
+        try {
+          const p = JSON.parse(cached);
+          if (typeof p.tfa_enabled === 'boolean') setTfaEnabled(p.tfa_enabled);
+          if (p.security_question) setSavedQuestion(p.security_question);
+        } catch {}
+      }
+      const fresh = await apiGet('/api/users/profile').catch(()=>null);
+      if (fresh) {
+        if (typeof fresh.tfa_enabled === 'boolean') setTfaEnabled(fresh.tfa_enabled);
+        if (fresh.security_question) setSavedQuestion(fresh.security_question);
+        await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(fresh)).catch(()=>{});
+      }
+    };
+    load();
+  }, []);
+
+  const persist = async (changes: any) => {
+    setSaving(true);
+    try {
+      const updated = await apiPut('/api/users/profile', changes);
+      await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(updated)).catch(()=>{});
+      showToast({ message: 'Security settings updated', variant: 'success' });
+    } finally { setSaving(false); }
+  };
+
+  const toggleTfa = async () => {
+    const next = !tfaEnabled;
+    setTfaEnabled(next);
+    if (!next) {
       setSavedQuestion('');
       setSavedAnswer('');
     }
+    await persist({ tfa_enabled: next });
   };
 
   const handleSecurityQuestionPress = () => {
@@ -77,14 +112,13 @@ const closeBottomSheet = () => {
     setQuestionDropdownOpen(false);
   };
 
-  const handleSaveQuestion = () => {
-    // Dismiss keyboard first
+  const handleSaveQuestion = async () => {
     Keyboard.dismiss();
-
-    // Save the security question and answer
     if (selectedQuestion && securityAnswer) {
+      const hash = simpleHash(securityAnswer);
       setSavedQuestion(selectedQuestion);
-      setSavedAnswer(securityAnswer);
+      setSavedAnswer('');
+      await persist({ security_question: selectedQuestion, security_answer_hash: hash });
       closeBottomSheet();
     }
   };
@@ -189,11 +223,11 @@ const closeBottomSheet = () => {
 
                 <View style={styles.buttonContainer}>
                   <TouchableOpacity
-                    style={[styles.saveButton, !securityAnswer && styles.disabledButton]}
+                    style={[styles.saveButton, (!securityAnswer || saving) && styles.disabledButton]}
                     onPress={handleSaveQuestion}
-                    disabled={!securityAnswer}
+                    disabled={!securityAnswer || saving}
                   >
-                    <Text style={styles.saveButtonText}>Save question</Text>
+                    <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save question'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -477,3 +511,13 @@ const styles = StyleSheet.create({
 });
 
 export default TwoFactorAuthScreen;
+
+// very simple non-cryptographic hash for demo; replace with proper hashing server-side
+function simpleHash(input: string) {
+  let h = 0;
+  for (let i = 0; i < input.length; i++) {
+    h = (h << 5) - h + input.charCodeAt(i);
+    h |= 0;
+  }
+  return String(h);
+}

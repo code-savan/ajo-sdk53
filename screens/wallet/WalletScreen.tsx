@@ -60,7 +60,8 @@ export default function WalletScreen() {
         } else {
           merged = transactions || []
         }
-        const preview = (merged || []).slice(0,4)
+        const filtered = (merged || []).filter((t:any) => t.source !== 'fee')
+        const preview = filtered.slice(0,4)
         setTransactions(preview)
         await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(preview)).catch(()=>{})
       } finally {
@@ -91,7 +92,7 @@ export default function WalletScreen() {
     const yesterday = new Date(now); yesterday.setDate(now.getDate()-1);
     const rightTime = isToday ? dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : (dt.toDateString() === yesterday.toDateString() ? 'Yesterday' : dt.toLocaleDateString([], { month: 'short', day: 'numeric' }));
     return (
-      <View style={styles.txnRow}>
+      <TouchableOpacity style={styles.txnRow} onPress={() => navigation.dispatch(CommonActions.navigate('TransactionDetail' as any, { txn: item } as any))}>
         {/* <View style={styles.txnIcon} /> */}
         <View style={styles.transactionIconContainer}>
         {isPositive ? (
@@ -108,7 +109,7 @@ export default function WalletScreen() {
           <Text style={[styles.txnAmount, isPositive ? styles.positive : styles.negative]}>{amount}</Text>
           <Text style={styles.txnRightTime}>{rightTime}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 

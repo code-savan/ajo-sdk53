@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SectionList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { apiGet } from '../../lib/api';
@@ -61,7 +61,7 @@ export default function TransactionsScreen() {
         } else {
           merged = transactions
         }
-        setTransactions(merged)
+        setTransactions(merged.filter(t=>t.source !== 'fee'))
         await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(merged)).catch(()=>{})
       } finally {
         setLoading(false)
@@ -174,10 +174,10 @@ function renderTxnRow(item: TxnItem) {
         <Text style={styles.transactionName}>{title}</Text>
         <Text style={styles.transactionType}>{subtitle}</Text>
       </View>
-      <View style={styles.rightCol}>
+      <TouchableOpacity style={styles.rightCol} onPress={() => (useNavigation as any).dispatch(CommonActions.navigate('TransactionDetail' as any, { txn: item } as any))}>
         <Text style={[styles.transactionAmount, isPositive ? styles.positive : styles.negative]}>{amount}</Text>
         <Text style={styles.rightTime}>{rightTime}</Text>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   filterText: { color: '#4B5563', fontSize: 14 },
 
   transactionsContentContainer: { paddingHorizontal: 20, paddingBottom: 20 },
-  sectionHeader: { fontSize: 14, fontWeight: '400', color: '#111827', marginTop: 16, marginBottom: 8 },
+  sectionHeader: { fontSize: 14, fontWeight: '400', color: '#111827', paddingTop: 16, paddingBottom: 8, backgroundColor: '#FFFFFF' },
 
   transaction: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16 },
   transactionIconContainer: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#ffffff', borderStyle: 'solid', borderWidth: 1, borderColor: '#F4F4F2', justifyContent: 'center', alignItems: 'center', marginRight: 12 },

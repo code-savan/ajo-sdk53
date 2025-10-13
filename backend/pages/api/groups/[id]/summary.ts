@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { verifyAccessToken } from '@/utils/jwt'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -29,13 +29,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Compute balances from ledger
-    const { data: credits } = await supabase
+    const { data: credits } = await supabaseAdmin
       .from('group_balance_ledger')
       .select('amount_cents')
       .eq('group_id', groupId)
       .eq('direction', 'credit')
 
-    const { data: debits } = await supabase
+    const { data: debits } = await supabaseAdmin
       .from('group_balance_ledger')
       .select('amount_cents')
       .eq('group_id', groupId)
@@ -43,13 +43,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const sum = (rows?: { amount_cents: number }[]) => (rows || []).reduce((a, r) => a + Number(r.amount_cents), 0)
 
-    const totalCredits = sum(credits)
+    let totalCredits = sum(credits)
     const totalDebits = sum(debits)
+
+    // Fallbacks for older flows: include succeeded group deposits or covered contributions if ledger is empty
+    if (!totalCredits) {
+      try {
+        const { data: deps } = await supabaseAdmin
+          .from('group_deposits')
+          .select('net_amount_cents,status')
+          .eq('group_id', groupId)
+          .eq('status', 'succeeded')
+        const depSum = (deps || []).reduce((a, d: any) => a + Number(d.net_amount_cents || 0), 0)
+        totalCredits = depSum
+      } catch {}
+    }
+
+    if (!totalCredits) {
+      try {
+        const { data: contribs } = await supabaseAdmin
+          .from('contributions')
+          .select('amount_cents,status')
+          .eq('group_id', groupId)
+          .eq('status', 'covered')
+        const cSum = (contribs || []).reduce((a, c: any) => a + Number(c.amount_cents || 0), 0)
+        totalCredits = cSum
+      } catch {}
+    }
+
     const availableBalanceCents = totalCredits - totalDebits
 
     const duration_months = Math.ceil(Number(group.goal_amount_cents) / Number(group.contribution_amount_cents))
 
-    return res.json({ success: true, data: { group, availableBalanceCents, duration_months } })
+    // Fetch owner data for member card
+    let ownerName: string | null = null
+    let ownerAvatar: string | null = null
+    try {
+      const { data: owner } = await supabaseAdmin
+        .from('users')
+        .select('full_name, profile_image_url')
+        .eq('id', group.creator_user_id)
+        .maybeSingle()
+      ownerName = (owner as any)?.full_name || null
+      ownerAvatar = (owner as any)?.profile_image_url || null
+    } catch {}
+
+    return res.json({ success: true, data: { group, availableBalanceCents, totalContributedCents: totalCredits, totalDebitedCents: totalDebits, duration_months, owner_name: ownerName, profile_image_url: ownerAvatar } })
   } catch (e: any) {
     return res.status(401).json({ success: false, error: 'Invalid token' })
   }

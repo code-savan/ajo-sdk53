@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,17 @@ export default function CreateGroupScreen() {
   const [showSelectionOptions, setShowSelectionOptions] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-calculate goal amount = contributionAmount * groupSize
+  useEffect(() => {
+    const size = Number(groupSize);
+    const contrib = Number(contributionAmount);
+    if (!isNaN(size) && !isNaN(contrib) && size > 0 && contrib >= 0) {
+      setGoalAmount(String(size * contrib));
+    } else {
+      setGoalAmount('');
+    }
+  }, [groupSize, contributionAmount]);
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -158,7 +169,7 @@ export default function CreateGroupScreen() {
               </Text>
             </View>
 
-            {/* Goal Amount */}
+            {/* Goal Amount (auto-calculated) */}
             <View style={styles.inputSection}>
               <Text style={styles.inputLabel}>Goal amount</Text>
               <View style={styles.inputContainer}>
@@ -166,8 +177,8 @@ export default function CreateGroupScreen() {
                   style={styles.input}
                   placeholder="Enter goal amount"
                   value={goalAmount}
-                  onChangeText={setGoalAmount}
-                  keyboardType="number-pad"
+                  editable={false}
+                  selectTextOnFocus={false}
                 />
               </View>
             </View>

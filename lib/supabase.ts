@@ -3,12 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import 'react-native-url-polyfill/auto';
 
-// Get environment variables - hardcoded temporarily if not available
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://cpvgznbnczuqzmyvaxdo.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwdmd6bmJuY3p1cXpteXZheGRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjY2NTk2OTIsImV4cCI6MjA0MjIzNTY5Mn0.sb_publishable_Iif5JThVBSdooIAb_FoBug_IKBdGf1O';
+// Get environment variables (required)
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase environment variables not found. Using fallback values.');
+  throw new Error('Missing Supabase envs: EXPO_PUBLIC_SUPABASE_URL/EXPO_PUBLIC_SUPABASE_ANON_KEY');
 }
 
 // Create Supabase client with enhanced auth configuration

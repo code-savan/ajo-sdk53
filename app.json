@@ -46,7 +46,8 @@
         {
           "faceIDPermission": "This app uses Face ID for secure authentication and to protect your account."
         }
-      ]
+      ],
+      "expo-image-picker"
     ],
     "linking": {
       "scheme": "ajo",

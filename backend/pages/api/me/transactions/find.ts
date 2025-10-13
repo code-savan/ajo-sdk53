@@ -35,7 +35,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (error) return res.status(400).json({ success: false, error: error.message })
 
     const r = (data || [])[0]
-    return res.status(200).json({ success: true, data: r || null })
+    if (!r) return res.status(200).json({ success: true, data: null })
+
+    // Try find related fee row (same external_ref)
+    const { data: feeRow } = await supabase
+      .from('user_wallet_ledger')
+      .select('amount_cents, currency')
+      .eq('user_id', payload.userId)
+      .eq('external_ref', ext)
+      .eq('source', 'fee')
+      .maybeSingle()
+
+    const enriched = feeRow ? { ...r, fee_cents: Number(feeRow.amount_cents), fee_currency: feeRow.currency } : r
+    return res.status(200).json({ success: true, data: enriched })
   } catch (e: any) {
     return res.status(500).json({ success: false, error: 'Failed to find transaction' })
   }

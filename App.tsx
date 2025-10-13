@@ -37,6 +37,7 @@ import BankTransferDetailsScreen from './screens/wallet/BankTransferDetailsScree
 import CardPaymentScreen from './screens/wallet/CardPaymentScreen';
 import WalletFundedScreen from './screens/wallet/WalletFundedScreen';
 import TransactionsScreen from './screens/wallet/TransactionsScreen';
+import TransactionDetailScreen from './screens/wallet/TransactionDetailScreen';
 import WalletAndPaymentScreen from './screens/profile/WalletAndPaymentScreen';
 import AccountInfoScreen from './screens/profile/AccountInfoScreen';
 import SecurityScreen from './screens/profile/SecurityScreen';
@@ -48,6 +49,7 @@ import ChangePinScreen from './screens/profile/ChangePinScreen';
 import TwoFactorAuthScreen from './screens/profile/TwoFactorAuthScreen';
 import VerifyAccountScreen from './screens/profile/VerifyAccountScreen';
 import NotificationDetailScreen from './screens/notifications/NotificationDetailScreen';
+import InviteLandingScreen from './screens/groups/InviteLandingScreen';
 
 // Import contexts
 import { SupabaseAuthProvider, useAuth } from './contexts/SupabaseAuthContext';
@@ -55,6 +57,7 @@ import { LoadingProvider } from './contexts/LoadingContext';
 import { supabase } from './lib/supabase';
 import { apiGet } from './lib/api';
 import { ToastProvider } from './contexts/ToastContext';
+import { StripeProvider } from '@stripe/stripe-react-native';
 
 // Navigation types
 export type RootStackParamList = {
@@ -82,9 +85,10 @@ export type RootStackParamList = {
     amount_cents?: number;
     currency?: string;
   } | undefined;
-  CardPayment: undefined;
+  CardPayment: { amount_cents: number; currency?: string } | undefined;
   WalletFunded: { payment_intent_id?: string; amount_cents?: number; currency?: string } | undefined;
   Transactions: undefined;
+  TransactionDetail: { txn: any } | undefined;
   Wallet: undefined;
   WalletAndPayment: undefined;
   CreateGroup: undefined;
@@ -114,6 +118,7 @@ export type RootStackParamList = {
   TwoFactorAuth: undefined;
   VerifyAccount: undefined;
   NotificationDetail: { notification: { id: string; title: string; message: string; type: string; } };
+  InviteLanding: { code?: string } | undefined;
 };
 
 export type MainTabParamList = {
@@ -136,6 +141,12 @@ const linking = {
   config: {
     screens: {
       Welcome: 'auth/callback',
+      InviteLanding: {
+        path: 'invite',
+        parse: {
+          code: (code: string) => code,
+        },
+      },
     },
   },
 };
@@ -283,12 +294,14 @@ function AppNavigator() {
         {/* Main app */}
         <Stack.Screen name="MainTabs" component={MainTabs} />
         {/* Other screens */}
+        <Stack.Screen name="InviteLanding" component={InviteLandingScreen} />
         <Stack.Screen name="FundWallet" component={FundWalletScreen} />
         <Stack.Screen name="WithdrawFunds" component={WithdrawFundsScreen} />
         <Stack.Screen name="BankTransferDetails" component={BankTransferDetailsScreen} />
         <Stack.Screen name="CardPayment" component={CardPaymentScreen} />
         <Stack.Screen name="WalletFunded" component={WalletFundedScreen} />
         <Stack.Screen name="Transactions" component={TransactionsScreen} />
+        <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
         <Stack.Screen name="Wallet" component={WalletScreen} />
         <Stack.Screen name="WalletAndPayment" component={WalletAndPaymentScreen} />
         <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
@@ -321,7 +334,9 @@ export default function App() {
       <SupabaseAuthProvider>
         <LoadingProvider>
           <ToastProvider>
-            <AppNavigator />
+            <StripeProvider publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''} urlScheme="ajo">
+              <AppNavigator />
+            </StripeProvider>
           </ToastProvider>
         </LoadingProvider>
       </SupabaseAuthProvider>

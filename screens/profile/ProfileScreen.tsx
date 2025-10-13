@@ -7,6 +7,9 @@ import { RootStackParamList } from '../../App';
 import BottomNavigation from '../../components/BottomNavigation';
 import { ChevronRight, Trash2, LogOut } from 'lucide-react-native';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { apiPost } from '../../lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiGet } from '../../lib/api';
 
 // Define the navigation type for this screen
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -18,6 +21,28 @@ export default function ProfileScreen() {
   const [pin, setPin] = React.useState('');
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [showAccountSwitchModal, setShowAccountSwitchModal] = React.useState(false);
+  const [profile, setProfile] = React.useState<any | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const CACHE_KEY = 'profile_cache_v1';
+    const load = async () => {
+      try {
+        const cached = await AsyncStorage.getItem(CACHE_KEY);
+        if (cached) {
+          try { const obj = JSON.parse(cached); if (mounted) { setProfile(obj); setLoading(false); } } catch {}
+        }
+        const fresh = await apiGet('/api/users/profile').catch(()=>null);
+        if (fresh && mounted) {
+          setProfile(fresh);
+          await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(fresh)).catch(()=>{});
+        }
+      } finally { if (mounted) setLoading(false); }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -137,17 +162,17 @@ export default function ProfileScreen() {
           <View style={styles.profileContainer}>
             <Image
               source={{
-                uri: 'https://cdn.jsdelivr.net/gh/alohe/avatars/png/notion_11.png'
+                uri: profile?.profile_image_url || 'https://cdn.jsdelivr.net/gh/alohe/avatars/png/notion_11.png'
               }}
               style={styles.profileImage}
             />
             {/* https://cdn.jsdelivr.net/gh/alohe/avatars/png/memo_35.png */}
             <View style={styles.profileTextContainer}>
               <Text style={styles.profileName}>
-                {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+                {profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
               </Text>
               <Text style={styles.profileEmail}>
-                {user?.email || 'user@example.com'}
+                {profile?.email || user?.email || 'user@example.com'}
               </Text>
             </View>
 
@@ -271,6 +296,13 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={styles.saveButton}
               disabled={pin.length !== 4}
+              onPress={async () => {
+                if (pin.length !== 4) return;
+                try {
+                  await apiPost('/api/users/delete', {});
+                } catch {}
+                await performLogout();
+              }}
             >
               <Text style={styles.saveButtonText}>Delete account</Text>
             </TouchableOpacity>

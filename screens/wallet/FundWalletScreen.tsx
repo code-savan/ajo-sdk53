@@ -39,10 +39,10 @@ export default function FundWalletScreen() {
         setSubmitting(false);
         return;
       }
-      const data = await apiPost('/api/wallet/funding-intent', { amount_cents: cents });
-      navigation.navigate('BankTransferDetails', { instructions: data.funding_instructions, payment_intent_id: data.payment_intent_id, amount_cents: data.transfer_amount_cents, currency });
+      // Send gross to be charged; include net for display/reference
+      navigation.navigate('CardPayment' as any, { amount_cents: grossCents, currency, net_amount_cents: cents } as any);
     } catch (e: any) {
-      showToast({ message: 'Failed to create bank details. Please try again.', variant: 'error' });
+      showToast({ message: 'Failed to start card payment. Please try again.', variant: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -74,7 +74,7 @@ export default function FundWalletScreen() {
           </View>
 
           <TouchableOpacity style={[styles.proceedButton, submitting && { opacity: 0.6 }]} onPress={handleProceed} disabled={submitting}>
-            <Text style={styles.proceedButtonText}>{submitting ? 'Processing...' : 'Get bank details'}</Text>
+            <Text style={styles.proceedButtonText}>{submitting ? 'Processing...' : 'Pay with card'}</Text>
           </TouchableOpacity>
         </ScrollView>
     </SafeAreaView>

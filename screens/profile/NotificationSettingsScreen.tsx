@@ -4,6 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { ChevronLeft } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiGet, apiPut } from '../../lib/api';
+import { useToast } from '../../contexts/ToastContext';
 
 // Define navigation prop types
 interface NotificationSettingsScreenProps {
@@ -14,21 +17,60 @@ const NotificationSettingsScreen: React.FC<NotificationSettingsScreenProps> = ({
   const [pushNotifications, setPushNotifications] = React.useState(true);
   const [emailNotifications, setEmailNotifications] = React.useState(true);
   const [smsAlerts, setSmsAlerts] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const { showToast } = useToast();
 
   const handleGoBack = () => {
     navigation.goBack();
   };
 
+  React.useEffect(() => {
+    const load = async () => {
+      const cached = await AsyncStorage.getItem('profile_cache_v1');
+      if (cached) {
+        try {
+          const p = JSON.parse(cached);
+          if (typeof p.push_notifications === 'boolean') setPushNotifications(p.push_notifications);
+          if (typeof p.email_notifications === 'boolean') setEmailNotifications(p.email_notifications);
+          if (typeof p.sms_alerts === 'boolean') setSmsAlerts(p.sms_alerts);
+        } catch {}
+      }
+      const fresh = await apiGet('/api/users/profile').catch(()=>null);
+      if (fresh) {
+        if (typeof fresh.push_notifications === 'boolean') setPushNotifications(fresh.push_notifications);
+        if (typeof fresh.email_notifications === 'boolean') setEmailNotifications(fresh.email_notifications);
+        if (typeof fresh.sms_alerts === 'boolean') setSmsAlerts(fresh.sms_alerts);
+        await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(fresh)).catch(()=>{});
+      }
+    };
+    load();
+  }, []);
+
+  const persist = async (changes: Partial<{ push_notifications: boolean; email_notifications: boolean; sms_alerts: boolean }>) => {
+    try {
+      setSaving(true);
+      const updated = await apiPut('/api/users/profile', changes);
+      await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(updated)).catch(()=>{});
+      showToast({ message: 'Preferences updated', variant: 'success' });
+    } finally { setSaving(false); }
+  };
+
   const togglePushNotifications = () => {
-    setPushNotifications((previousState) => !previousState);
+    const next = !pushNotifications;
+    setPushNotifications(next);
+    persist({ push_notifications: next });
   };
 
   const toggleEmailNotifications = () => {
-    setEmailNotifications((previousState) => !previousState);
+    const next = !emailNotifications;
+    setEmailNotifications(next);
+    persist({ email_notifications: next });
   };
 
   const toggleSmsAlerts = () => {
-    setSmsAlerts((previousState) => !previousState);
+    const next = !smsAlerts;
+    setSmsAlerts(next);
+    persist({ sms_alerts: next });
   };
 
   return (

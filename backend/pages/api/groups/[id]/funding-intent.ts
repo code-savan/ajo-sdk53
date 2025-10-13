@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { verifyAccessToken } from '@/utils/jwt'
 import stripe from '@/lib/stripe'
 
@@ -54,16 +54,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     })
 
-    const instructions = await stripe.paymentIntents.createFundingInstructions(
-      paymentIntent.id,
-      {
-        bank_transfer: { type: BANK_TRANSFER_TYPE as any },
-        currency,
-        funding_type: 'bank_transfer'
-      }
-    )
+    // Create funding instructions via the Customers API using the group's Stripe customer
+    const instructions = await (stripe.customers as any).createFundingInstructions(group.stripe_customer_id, {
+      bank_transfer: { type: BANK_TRANSFER_TYPE },
+      currency,
+      funding_type: 'bank_transfer'
+    })
 
-    const { error: depErr } = await supabase
+    const { error: depErr } = await supabaseAdmin
       .from('group_deposits')
       .insert({
         group_id: groupId,

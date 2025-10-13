@@ -61,8 +61,9 @@ export default function WalletFundedScreen() {
     );
   }
 
-  const displayAmount = (amount_cents || tx?.amount_cents || 0) / 100;
-  const displayCurrency = (currency || tx?.currency || 'USD').toUpperCase();
+  const displayAmount = ((tx?.amount_cents ?? amount_cents) || 0) / 100;
+  const displayCurrency = (tx?.currency || currency || 'USD').toUpperCase();
+  const feeCents = typeof tx?.fee_cents === 'number' ? Number(tx?.fee_cents) : null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -98,9 +99,18 @@ export default function WalletFundedScreen() {
             </Text>
           </View>
 
+          {typeof feeCents === 'number' ? (
+            <View style={styles.transactionRow}>
+              <Text style={styles.transactionLabel}>Fee</Text>
+              <Text style={styles.transactionValue}>
+                {(feeCents/100).toLocaleString('en-US',{ style:'currency', currency: displayCurrency })}
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.transactionRow}>
             <Text style={styles.transactionLabel}>Payment method</Text>
-            <Text style={styles.transactionValue}>Bank Transfer</Text>
+            <Text style={styles.transactionValue}>Card</Text>
           </View>
 
           <View style={styles.divider} />

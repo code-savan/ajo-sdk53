@@ -1,27 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Pressable, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Pressable, KeyboardAvoidingView, Platform, Keyboard, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { ChevronLeft, Pencil } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiGet, apiPut } from '../../lib/api';
+import { useToast } from '../../contexts/ToastContext';
+import * as ImagePicker from 'expo-image-picker';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
 
 type AccountInfoScreenProps = {
   navigation: StackNavigationProp<RootStackParamList>;
 };
 
 export default function AccountInfoScreen({ navigation }: AccountInfoScreenProps) {
-  const [fullName, setFullName] = useState('Dean Winchester');
-  const [email, setEmail] = useState('deanwinchester@gmail.com');
-  const [phoneNumber, setPhoneNumber] = useState('+1 555 0324');
+  const { showToast } = useToast();
+  const { user } = useAuth();
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState<string>('');
+  const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<{ name: string; code: string; dial: string; flag: string }>(COUNTRIES[0]);
 
   const handleGoBack = () => {
     navigation.goBack();
   };
 
-  const handleSaveChanges = () => {
-    // Save user information here
-    navigation.goBack();
+  const handleSaveChanges = async () => {
+    try {
+      setSaving(true);
+      const normalized = toE164(selectedCountry.dial, phoneNumber);
+      const updated = await apiPut('/api/users/profile', { full_name: fullName, phone: normalized });
+      await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(updated)).catch(()=>{});
+      showToast({ message: 'Profile updated', variant: 'success' });
+      navigation.goBack();
+    } catch (e: any) {
+      showToast({ message: 'Update failed', variant: 'error' });
+    } finally { setSaving(false); }
   };
 
   // Set up keyboard listeners to track keyboard visibility
@@ -40,6 +61,30 @@ export default function AccountInfoScreen({ navigation }: AccountInfoScreenProps
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
     };
+  }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      const cached = await AsyncStorage.getItem('profile_cache_v1');
+      if (cached) {
+        try {
+          const obj = JSON.parse(cached);
+          setFullName(obj?.full_name || '');
+          setEmail(obj?.email || '');
+          setPhoneNumber(obj?.phone || '');
+          setProfileImageUrl(obj?.profile_image_url || 'https://cdn.jsdelivr.net/gh/alohe/avatars/png/notion_11.png');
+        } catch {}
+      }
+      const fresh = await apiGet('/api/users/profile').catch(()=>null);
+      if (fresh) {
+        setFullName(fresh?.full_name || '');
+        setEmail(fresh?.email || '');
+        setPhoneNumber(fresh?.phone || '');
+        setProfileImageUrl(fresh?.profile_image_url || 'https://cdn.jsdelivr.net/gh/alohe/avatars/png/notion_11.png');
+        await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(fresh)).catch(()=>{});
+      }
+    };
+    load();
   }, []);
 
   return (
@@ -64,10 +109,10 @@ export default function AccountInfoScreen({ navigation }: AccountInfoScreenProps
 
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1543610892-0b1f7e6d8ac1?q=80&w=987' }}
+            source={{ uri: profileImageUrl || 'https://cdn.jsdelivr.net/gh/alohe/avatars/png/notion_11.png' }}
             style={styles.profileImage}
           />
-          <TouchableOpacity style={styles.editIcon}>
+          <TouchableOpacity style={styles.editIcon} onPress={() => setAvatarModalVisible(true)}>
             <Pencil color="#fff" size={16} />
           </TouchableOpacity>
         </View>
@@ -90,14 +135,14 @@ export default function AccountInfoScreen({ navigation }: AccountInfoScreenProps
 
         <Text style={styles.label}>Mobile No.</Text>
         <View style={styles.phoneInputContainer}>
-          <View style={styles.countryCodeContainer}>
-            <Text style={styles.flagEmoji}>🇺🇸</Text>
+          <TouchableOpacity style={styles.countryCodeContainer} onPress={() => setCountryPickerVisible(true)}>
+            <Text style={styles.flagEmoji}>{selectedCountry.flag}</Text>
             <Text style={styles.arrowDown}>▼</Text>
-          </View>
+          </TouchableOpacity>
           <TextInput
             style={styles.phoneInput}
             value={phoneNumber}
-            onChangeText={setPhoneNumber}
+            onChangeText={(t) => setPhoneNumber(t.replace(/[^0-9]/g, ''))}
           keyboardType="phone-pad"
         />
       </View>
@@ -107,6 +152,100 @@ export default function AccountInfoScreen({ navigation }: AccountInfoScreenProps
       <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges}>
         <Text style={styles.saveButtonText}>Save changes</Text>
       </TouchableOpacity>
+
+      {/* Avatar Picker Modal */}
+      <Modal
+        visible={avatarModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setAvatarModalVisible(false)}
+      >
+        <View style={styles.modalOverlayAvatar}>
+          <View style={styles.avatarSheet}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 16, fontWeight: '500', color: '#1C1C1C' }}>Choose an avatar</Text>
+              <TouchableOpacity onPress={() => setAvatarModalVisible(false)} style={styles.closeAvatarButton}><Text style={{ color: '#6B6B6B' }}>✕</Text></TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={{ backgroundColor: '#111827', paddingVertical: 10, borderRadius: 10, alignItems: 'center', marginBottom: 12 }}
+              onPress={async () => {
+                try {
+                  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                  if (perm.status !== 'granted') { showToast({ message: 'Permission denied', variant: 'error' }); return; }
+                  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+                  if (result.canceled || !result.assets?.length) return;
+                  const asset = result.assets[0];
+                  const uri = asset.uri;
+                  const resp = await fetch(uri);
+                  const blob = await resp.blob();
+                  const ext = (asset.fileName?.split('.').pop() || asset.type?.split('/').pop() || 'jpg').toLowerCase();
+                  const filename = `${user?.id || 'anon'}/${Date.now()}.${ext}`;
+                  const { data: upData, error: upErr } = await supabase.storage.from('avatars').upload(filename, blob, { upsert: true, contentType: blob.type || 'image/jpeg' });
+                  if (upErr) { showToast({ message: 'Upload failed', variant: 'error' }); return; }
+                  const { data: pub } = supabase.storage.from('avatars').getPublicUrl(upData.path);
+                  const publicUrl = pub.publicUrl;
+                  setProfileImageUrl(publicUrl);
+                  const updated = await apiPut('/api/users/profile', { profile_image_url: publicUrl });
+                  await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(updated)).catch(()=>{});
+                  showToast({ message: 'Avatar uploaded', variant: 'success' });
+                  setAvatarModalVisible(false);
+                } catch (e: any) {
+                  showToast({ message: 'Upload error', variant: 'error' });
+                }
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 14 }}>Upload from device</Text>
+            </TouchableOpacity>
+            <View style={styles.avatarGrid}>
+              {AVATARS.map((url) => (
+                <TouchableOpacity
+                  key={url}
+                  style={[styles.avatarItem, profileImageUrl === url && styles.avatarItemSelected]}
+                  onPress={async () => {
+                    try {
+                      setProfileImageUrl(url);
+                      const updated = await apiPut('/api/users/profile', { profile_image_url: url });
+                      await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(updated)).catch(()=>{});
+                      setAvatarModalVisible(false);
+                      showToast({ message: 'Avatar updated', variant: 'success' });
+                    } catch {}
+                  }}
+                >
+                  <Image source={{ uri: url }} style={styles.avatarThumb} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            {/* TODO: optional image picker from device in future; for now presets only */}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Country Picker Modal */}
+      <Modal
+        visible={countryPickerVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setCountryPickerVisible(false)}
+      >
+        <View style={styles.modalOverlayAvatar}>
+          <View style={styles.avatarSheet}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 16, fontWeight: '500', color: '#1C1C1C' }}>Select country</Text>
+              <TouchableOpacity onPress={() => setCountryPickerVisible(false)} style={styles.closeAvatarButton}><Text style={{ color: '#6B6B6B' }}>✕</Text></TouchableOpacity>
+            </View>
+            {COUNTRIES.map((c) => (
+              <TouchableOpacity
+                key={c.code}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}
+                onPress={() => { setSelectedCountry(c); setCountryPickerVisible(false); }}
+              >
+                <Text style={{ fontSize: 20, marginRight: 10 }}>{c.flag}</Text>
+                <Text style={{ fontSize: 14, color: '#1C1C1C' }}>{c.name}  <Text style={{ color: '#6B7280' }}>({c.dial})</Text></Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -241,4 +380,78 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  modalOverlayAvatar: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  avatarSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  closeAvatarButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#CACACA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  avatarItem: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  avatarItemSelected: {
+    borderColor: '#1C1C1C',
+  },
+  avatarThumb: {
+    width: '100%',
+    height: '100%',
+  },
 });
+
+// Simple preset avatars
+const AVATARS = [
+  'https://cdn.jsdelivr.net/gh/alohe/avatars/png/notion_11.png',
+  'https://cdn.jsdelivr.net/gh/alohe/avatars/png/memo_35.png',
+  'https://cdn.jsdelivr.net/gh/alohe/avatars/png/bear_09.png',
+  'https://cdn.jsdelivr.net/gh/alohe/avatars/png/bauhaus_32.png',
+  'https://cdn.jsdelivr.net/gh/alohe/avatars/png/figma_17.png',
+  'https://cdn.jsdelivr.net/gh/alohe/avatars/png/badger_09.png',
+  'https://cdn.jsdelivr.net/gh/alohe/avatars/png/paint_16.png',
+  'https://cdn.jsdelivr.net/gh/alohe/avatars/png/memoji_26.png',
+  'https://cdn.jsdelivr.net/gh/alohe/avatars/png/memoji_17.png',
+  'https://cdn.jsdelivr.net/gh/alohe/avatars/png/memoji_19.png',
+  'https://cdn.jsdelivr.net/gh/alohe/avatars/png/memoji_23.png',
+  'https://cdn.jsdelivr.net/gh/alohe/avatars/png/memoji_07.png',
+];
+
+// Minimal country list and E.164 normalization
+const COUNTRIES = [
+  { name: 'United States', code: 'US', dial: '+1', flag: '🇺🇸' },
+  { name: 'Nigeria', code: 'NG', dial: '+234', flag: '🇳🇬' },
+  { name: 'United Kingdom', code: 'GB', dial: '+44', flag: '🇬🇧' },
+  { name: 'Canada', code: 'CA', dial: '+1', flag: '🇨🇦' },
+];
+
+function toE164(dial: string, localDigits: string) {
+  const digits = String(localDigits || '').replace(/[^0-9]/g, '');
+  const dialDigits = dial.replace(/[^0-9]/g, '');
+  if (!digits) return '';
+  return `+${dialDigits}${digits}`;
+}

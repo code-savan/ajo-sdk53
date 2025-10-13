@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { verifyAccessToken } from '@/utils/jwt'
-import { supabase } from '@/lib/supabase'
-import stripe from '@/lib/stripe'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -34,44 +33,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { data: user } = await supabase
       .from('users')
-      .select('id, stripe_customer_id')
+      .select('id')
       .eq('id', (payload as any).userId)
       .single()
 
-    let customerId = user?.stripe_customer_id as string | null
-    if (!customerId) {
-      const customer = await stripe.customers.create({ metadata: { user_id: (payload as any).userId } })
-      customerId = customer.id
-      await supabase.from('users').update({ stripe_customer_id: customerId }).eq('id', (payload as any).userId)
-    }
-
-    // Debit from wallet via customer_balance PI
     const currency = group.currency || process.env.STRIPE_DEFAULT_CURRENCY || 'usd'
     const amount = Number(group.contribution_amount_cents)
+    const cycleNumber = Math.max(1, Number((group as any).current_cycle || 1))
 
-    const pi = await stripe.paymentIntents.create({
-      amount,
-      currency,
-      customer: customerId!,
-      payment_method_types: ['customer_balance'],
-      metadata: { type: 'user_contribution', user_id: (payload as any).userId, group_id: groupId, cycle_number: group.current_cycle }
-    })
+    // Check user wallet balance
+    const { data: walletRows } = await supabase
+      .from('user_wallet_ledger')
+      .select('direction, amount_cents')
+      .eq('user_id', (payload as any).userId)
+    let credits = 0, debits = 0
+    for (const r of walletRows || []) {
+      const v = Number(r.amount_cents)
+      if (r.direction === 'credit') credits += v; else debits += v
+    }
+    const balance = credits - debits
+    if (balance < amount) {
+      return res.status(400).json({ success: false, error: 'Insufficient wallet balance' })
+    }
 
-    // Mark logical contribution as covered (finalization can also be tied to webhook if desired)
-    await supabase
+    // Debit user wallet and credit group wallet
+    const externalRef = `grp_${groupId}_${Date.now()}`
+    const inserts: any[] = [
+      { user_id: (payload as any).userId, direction: 'debit', amount_cents: amount, currency, source: 'contribution', external_ref: externalRef, meta: { group_id: groupId, cycle_number: cycleNumber } },
+      { group_id: groupId, user_id: (payload as any).userId, direction: 'credit', amount_cents: amount, currency, source: 'deposit', external_ref: externalRef, meta: { type: 'group_contribution', cycle_number: cycleNumber } }
+    ]
+    const { error: uwlErr } = await supabaseAdmin.from('user_wallet_ledger').insert(inserts[0])
+    if (uwlErr) return res.status(400).json({ success: false, error: uwlErr.message })
+    const { error: gblErr } = await supabaseAdmin.from('group_balance_ledger').insert(inserts[1])
+    if (gblErr) return res.status(400).json({ success: false, error: gblErr.message })
+
+    // Log recent activity (basic example)
+    await supabaseAdmin.from('group_activities').insert({ group_id: groupId, actor_user_id: (payload as any).userId, action: 'contribution', amount_cents: amount, currency })
+
+    // Upsert contribution record
+    const { error: contribErr } = await supabaseAdmin
       .from('contributions')
-      .upsert({
-        group_id: groupId,
-        user_id: (payload as any).userId,
-        cycle_number: group.current_cycle,
-        amount_cents: amount,
-        status: 'covered',
-        allocated_from_deposit_ids: []
-      }, { onConflict: 'group_id,user_id,cycle_number' })
+      .upsert({ group_id: groupId, user_id: (payload as any).userId, cycle_number: cycleNumber, amount_cents: amount, status: 'covered', allocated_from_deposit_ids: [] }, { onConflict: 'group_id,user_id,cycle_number' })
+    if (contribErr) return res.status(400).json({ success: false, error: contribErr.message })
 
-    // Record debit in user wallet ledger on webhook success; for now we can optimistically return
-    return res.status(201).json({ success: true, data: { payment_intent_id: pi.id } })
+    return res.status(201).json({ success: true, data: { debited_cents: amount, external_ref: externalRef } })
   } catch (e: any) {
-    return res.status(500).json({ success: false, error: 'Contribution payment failed' })
+    return res.status(500).json({ success: false, error: e?.message || 'Contribution payment failed' })
   }
 }

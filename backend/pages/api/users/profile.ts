@@ -84,7 +84,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse<Use
       }
 
       case 'PUT': {
-        const { full_name, phone, profile_image_url } = req.body;
+        const { full_name, phone, profile_image_url, push_notifications, email_notifications, sms_alerts, tfa_enabled, security_question, security_answer_hash } = req.body as any;
         const { data: updatedUser, error: updateError } = await supabase
           .from('users')
           .update({
@@ -101,7 +101,28 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<ApiResponse<Use
           return res.status(400).json({ success: false, error: updateError.message });
         }
 
-        return res.json({ success: true, data: updatedUser as any });
+        // Optionally persist preferences if provided
+        if (typeof push_notifications === 'boolean' || typeof email_notifications === 'boolean' || typeof sms_alerts === 'boolean' || typeof tfa_enabled === 'boolean') {
+          await supabase
+            .from('users')
+            .update({
+              push_notifications: typeof push_notifications === 'boolean' ? push_notifications : (updatedUser as any).push_notifications,
+              email_notifications: typeof email_notifications === 'boolean' ? email_notifications : (updatedUser as any).email_notifications,
+              sms_alerts: typeof sms_alerts === 'boolean' ? sms_alerts : (updatedUser as any).sms_alerts,
+              tfa_enabled: typeof tfa_enabled === 'boolean' ? tfa_enabled : (updatedUser as any).tfa_enabled,
+              security_question: security_question || (updatedUser as any).security_question,
+              security_answer_hash: security_answer_hash || (updatedUser as any).security_answer_hash,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', payload.userId)
+        }
+
+        const { data: finalUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', payload.userId)
+          .single();
+        return res.json({ success: true, data: (finalUser || updatedUser) as any });
       }
 
       default:
