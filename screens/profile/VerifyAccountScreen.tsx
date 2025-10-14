@@ -11,7 +11,7 @@ import { ShieldCheck, ExternalLink } from 'lucide-react-native';
 
 export default function VerifyAccountScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-  const { session, signOut } = useAuth();
+  const { session, signOut, hasPin, isInSignupFlow } = useAuth();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<'pending'|'verified'|'no_account'|'unknown'|'in_review'>('unknown');
   const [displayName, setDisplayName] = useState('');
@@ -34,6 +34,11 @@ export default function VerifyAccountScreen() {
   };
 
   useEffect(() => {
+    // If arriving here during signup but PIN not set, redirect to SetPin first
+    if (isInSignupFlow && !hasPin) {
+      navigation.reset({ index: 0, routes: [{ name: 'SetPin' as any }] });
+      return;
+    }
     loadProfileAndStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

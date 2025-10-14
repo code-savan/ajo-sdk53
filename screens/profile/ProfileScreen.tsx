@@ -29,20 +29,26 @@ export default function ProfileScreen() {
     const CACHE_KEY = 'profile_cache_v1';
     const load = async () => {
       try {
+        // Always show cache instantly
         const cached = await AsyncStorage.getItem(CACHE_KEY);
-        if (cached) {
-          try { const obj = JSON.parse(cached); if (mounted) { setProfile(obj); setLoading(false); } } catch {}
+        if (cached && mounted) {
+          try { setProfile(JSON.parse(cached)); } catch {}
         }
+        setLoading(false);
+        // Refresh in background and update cache/state
         const fresh = await apiGet('/api/users/profile').catch(()=>null);
         if (fresh && mounted) {
           setProfile(fresh);
           await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(fresh)).catch(()=>{});
         }
-      } finally { if (mounted) setLoading(false); }
+      } finally {
+        if (mounted) setLoading(false);
+      }
     };
     load();
-    return () => { mounted = false; };
-  }, []);
+    const unsubscribe = navigation.addListener?.('focus', load as any);
+    return () => { mounted = false; if (unsubscribe) unsubscribe(); };
+  }, [navigation]);
 
   const handleLogout = () => {
     Alert.alert(

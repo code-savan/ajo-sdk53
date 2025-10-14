@@ -5,6 +5,7 @@ export type NotificationTemplate =
   | { kind: 'group_created'; group_name: string }
   | { kind: 'group_funded'; group_name: string; amount_cents: number; currency: string }
   | { kind: 'withdrawal'; amount_cents: number; currency: string }
+  | { kind: 'withdrawal_succeeded'; amount_cents: number; currency: string }
 
 export async function createNotification(userId: string, t: NotificationTemplate, extra?: any) {
   let title = ''
@@ -31,6 +32,11 @@ export async function createNotification(userId: string, t: NotificationTemplate
       title = 'Withdrawal requested'
       message = `Your withdrawal of ${(t.amount_cents/100).toLocaleString('en-US',{style:'currency',currency:t.currency.toUpperCase()})} is being processed.`
       type = 'info'
+      break
+    case 'withdrawal_succeeded':
+      title = 'Withdrawal completed'
+      message = `Your withdrawal of ${(t.amount_cents/100).toLocaleString('en-US',{style:'currency',currency:t.currency.toUpperCase()})} has been completed.`
+      type = 'success'
       break
   }
 

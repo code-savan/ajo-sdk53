@@ -7,33 +7,33 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { apiGet, apiPost } from '../../lib/api';
 
+const formatCurrency = (cents: number): string => {
+  const dollars = cents / 100;
+  return dollars.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 export default function WithdrawFundsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [amount, setAmount] = useState('$100');
   const [loading, setLoading] = useState(true);
-  const [groupId, setGroupId] = useState<string | null>(null);
   const [availableCents, setAvailableCents] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
-        // pick first group the user belongs to (MVP)
-        const groups = await apiGet<any[]>('/api/groups');
-        const g = groups?.[0];
-        if (g) {
-          setGroupId(g.id);
-          const bal = await apiGet(`/api/groups/${g.id}/balance`);
-          // in MVP, get current user's id net from perUserNetCents
-          const me = await apiGet('/api/users/profile');
-          const net = bal?.perUserNetCents?.[me?.id] || 0;
-          setAvailableCents(net);
-        } else {
-          setGroupId(null);
-          setAvailableCents(0);
-        }
+        const balance = await apiGet('/api/wallet/balance').catch(()=>({ balanceCents: 0 }));
+        const pending = await apiGet('/api/wallet/pending').catch(()=>({ pending_cents: 0 }));
+        const available = Number(balance?.balanceCents || 0) - Number((pending as any)?.pending_cents || 0);
+        setAvailableCents(Math.max(0, available));
       } catch {
         setError('Failed to load balance');
       } finally {
@@ -43,15 +43,26 @@ export default function WithdrawFundsScreen() {
     load();
   }, []);
 
+  useEffect(() => {
+    const loadAccounts = async () => {
+      try {
+        setAccountsLoading(true);
+        const res = await apiGet('/api/wallet/bank-accounts').catch(()=>[]);
+        const arr = Array.isArray(res) ? res : [];
+        setAccounts(arr);
+        setSelectedAccountId(arr[0]?.id || null);
+      } finally { setAccountsLoading(false); }
+    };
+    const unsub = navigation.addListener('focus', loadAccounts);
+    loadAccounts();
+    return unsub;
+  }, [navigation]);
+
   const handleGoBack = () => {
     navigation.goBack();
   };
 
   const handleProceed = async () => {
-    if (!groupId) {
-      Alert.alert('No group', 'Join or create a group first.');
-      return;
-    }
     const cents = Math.round(parseFloat(amount.replace('$', '')) * 100);
     if (cents <= 0) {
       Alert.alert('Invalid amount', 'Enter a valid amount.');
@@ -61,9 +72,13 @@ export default function WithdrawFundsScreen() {
       Alert.alert('Insufficient funds', 'Amount exceeds your available credits.');
       return;
     }
+    if (!selectedAccountId) {
+      Alert.alert('No account', 'Please link a bank account first.');
+      return;
+    }
     try {
       setSubmitting(true);
-      await apiPost(`/api/groups/${groupId}/withdraw`, { amount_cents: cents });
+      await apiPost(`/api/wallet/withdraw`, { amount_cents: cents, bank_account_id: selectedAccountId });
       Alert.alert('Requested', 'Withdrawal initiated.');
       navigation.goBack();
     } catch (e: any) {
@@ -89,13 +104,9 @@ export default function WithdrawFundsScreen() {
             Easily transfer money from your wallet to your linked bank account.
           </Text>
           {loading ? <ActivityIndicator style={{ marginTop: 8 }} /> : null}
-          {groupId ? (
-            <Text style={{ marginTop: 8, color: '#6B7280' }}>
-              Available: ${(availableCents/100).toFixed(2)}
-            </Text>
-          ) : (
-            <Text style={{ marginTop: 8, color: '#ef4444' }}>No group found.</Text>
-          )}
+          <Text style={{ marginTop: 8, color: '#6B7280' }}>
+            Available: ${formatCurrency(availableCents)}
+          </Text>
           {error ? <Text style={{ marginTop: 8, color: '#ef4444' }}>{error}</Text> : null}
         </View>
 
@@ -114,13 +125,32 @@ export default function WithdrawFundsScreen() {
 
         <View style={styles.inputSection}>
           <Text style={styles.inputLabel}>Withdraw to</Text>
-          <View style={styles.inputContainer}>
-            <Text style={styles.paymentMethod}>Bank Transfer</Text>
-          </View>
+          {accountsLoading ? (
+            <ActivityIndicator />
+          ) : accounts.length === 0 ? (
+            <View style={styles.inputContainer}>
+              <Text style={[styles.paymentMethod, { marginBottom: 8 }]}>No linked accounts</Text>
+              <TouchableOpacity onPress={()=>navigation.navigate('WalletAndPayment' as never)} style={styles.linkCta}>
+                <Text style={styles.linkCtaText}>Manage linked account</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{ gap: 10 }}>
+              {accounts.map((a) => (
+                <TouchableOpacity key={a.id} style={styles.accountRow} onPress={()=>setSelectedAccountId(a.id)}>
+                  <View style={[styles.radio, selectedAccountId===a.id && styles.radioActive]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.accountTitle}>{a.bank_name}</Text>
+                    <Text style={styles.accountSub}>{a.account_holder_name} • ••••{a.account_number_last4}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={[styles.proceedButton, submitting && { opacity: 0.6 }]} onPress={handleProceed} disabled={submitting || loading || !groupId}>
+          <TouchableOpacity style={[styles.proceedButton, submitting && { opacity: 0.6 }]} onPress={handleProceed} disabled={submitting || loading}>
             <Text style={styles.proceedButtonText}>{submitting ? 'Processing...' : 'Proceed'}</Text>
           </TouchableOpacity>
         </View>
@@ -199,6 +229,13 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontWeight: '400',
   },
+  linkCta: { backgroundColor: '#111111', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  linkCtaText: { color: '#FFFFFF', fontSize: 14 },
+  accountRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#fff' },
+  radio: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: '#D1D5DB', marginRight: 12 },
+  radioActive: { borderColor: '#111111', backgroundColor: '#111111' },
+  accountTitle: { fontSize: 14, fontWeight: '500', color: '#1C1C1C' },
+  accountSub: { fontSize: 12, color: '#6B7280' },
   buttonContainer: {
     flex: 1,
     justifyContent: 'flex-end',

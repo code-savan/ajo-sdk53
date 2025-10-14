@@ -2,8 +2,10 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/api/notifications": "pages/api/notifications.js",
+  "/api/wallet/pending": "pages/api/wallet/pending.js",
+  "/api/wallet/balance": "pages/api/wallet/balance.js",
   "/api/me/transactions": "pages/api/me/transactions.js",
+  "/api/users/profile": "pages/api/users/profile.js",
   "/api/groups": "pages/api/groups.js",
-  "/api/users/profile": "pages/api/users/profile.js"
+  "/api/notifications": "pages/api/notifications.js"
 }

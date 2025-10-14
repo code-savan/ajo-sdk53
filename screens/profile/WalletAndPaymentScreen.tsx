@@ -35,7 +35,13 @@ export default function WalletAndPaymentScreen() {
             </Text>
           </View>
 
-          {/* Additional content can be added here as needed */}
+          <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('LinkAccount' as never)}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>Manage linked account</Text>
+              <Text style={styles.cardSubtitle}>Securely connect your bank or wallet to get started.</Text>
+            </View>
+            <Text style={{ color: '#4D4845' }}>›</Text>
+          </TouchableOpacity>
 
         </View>
       </ScrollView>
@@ -86,4 +92,7 @@ const styles = StyleSheet.create({
     fontWeight: "regular",
     color: '#303030',
   },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 16 },
+  cardTitle: { fontSize: 16, color: '#1C1C1C', marginBottom: 6 },
+  cardSubtitle: { fontSize: 12, color: '#9CA3AF' },
 });

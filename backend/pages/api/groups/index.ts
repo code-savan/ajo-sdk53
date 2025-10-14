@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin as supabase } from '@/lib/supabase'
 import stripe from '@/lib/stripe'
+import { createNotification } from '../notifications/templates'
 import { verifyAccessToken } from '@/utils/jwt'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -98,6 +99,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const duration_months = Math.ceil(Number(goal_amount_cents) / Number(contribution_amount_cents))
+
+      // Notify creator
+      try {
+        await createNotification((payload as any).userId, { kind: 'group_created', group_name: name })
+      } catch {}
 
       return res.status(201).json({ success: true, data: { group, duration_months } })
     }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Pressable, KeyboardAvoidingView, Platform, Keyboard, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Pressable, KeyboardAvoidingView, Platform, Keyboard, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
@@ -25,6 +25,7 @@ export default function AccountInfoScreen({ navigation }: AccountInfoScreenProps
   const [saving, setSaving] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string>('');
   const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<{ name: string; code: string; dial: string; flag: string }>(COUNTRIES[0]);
 
@@ -87,6 +88,21 @@ export default function AccountInfoScreen({ navigation }: AccountInfoScreenProps
     load();
   }, []);
 
+  useEffect(() => {
+    if (!avatarModalVisible) return;
+    (async () => {
+      try {
+        const perm = await ImagePicker.getMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          const req = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!req.granted) {
+            showToast({ message: 'Media library permission is required', variant: 'error' });
+          }
+        }
+      } catch {}
+    })();
+  }, [avatarModalVisible]);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -112,6 +128,11 @@ export default function AccountInfoScreen({ navigation }: AccountInfoScreenProps
             source={{ uri: profileImageUrl || 'https://cdn.jsdelivr.net/gh/alohe/avatars/png/notion_11.png' }}
             style={styles.profileImage}
           />
+          {uploadingAvatar && (
+            <View style={styles.avatarLoadingOverlay}>
+              <ActivityIndicator size="small" color="#fff" />
+            </View>
+          )}
           <TouchableOpacity style={styles.editIcon} onPress={() => setAvatarModalVisible(true)}>
             <Pencil color="#fff" size={16} />
           </TouchableOpacity>
@@ -170,27 +191,42 @@ export default function AccountInfoScreen({ navigation }: AccountInfoScreenProps
               style={{ backgroundColor: '#111827', paddingVertical: 10, borderRadius: 10, alignItems: 'center', marginBottom: 12 }}
               onPress={async () => {
                 try {
-                  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                  if (perm.status !== 'granted') { showToast({ message: 'Permission denied', variant: 'error' }); return; }
-                  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-                  if (result.canceled || !result.assets?.length) return;
+                  // Permissions first
+                  const perm = await ImagePicker.getMediaLibraryPermissionsAsync();
+                  if (!perm.granted) {
+                    const req = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                    if (!req.granted) { showToast({ message: 'Permission denied', variant: 'error' }); return; }
+                  }
+
+                  // Compute mediaTypes compatible across versions
+                  const mediaTypes: any = (ImagePicker as any).MediaType?.Images ?? (ImagePicker as any).MediaTypeOptions?.Images;
+                  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes, quality: 0.8 } as any);
+                  if ((result as any)?.cancelled === true || result.canceled || !result.assets?.length) { return; }
+
+                  // Begin loading state and close modal only after selection
+                  setAvatarModalVisible(false);
+                  setUploadingAvatar(true);
+
                   const asset = result.assets[0];
                   const uri = asset.uri;
                   const resp = await fetch(uri);
-                  const blob = await resp.blob();
-                  const ext = (asset.fileName?.split('.').pop() || asset.type?.split('/').pop() || 'jpg').toLowerCase();
+                  const arrayBuffer = await resp.arrayBuffer();
+                  const ext = (asset.fileName?.split('.').pop() || (asset as any).mimeType?.split('/')?.pop() || asset.type?.split('/')?.pop() || 'jpg').toLowerCase();
                   const filename = `${user?.id || 'anon'}/${Date.now()}.${ext}`;
-                  const { data: upData, error: upErr } = await supabase.storage.from('avatars').upload(filename, blob, { upsert: true, contentType: blob.type || 'image/jpeg' });
-                  if (upErr) { showToast({ message: 'Upload failed', variant: 'error' }); return; }
+                  const contentType = (asset as any).mimeType || asset.type || (ext === 'png' ? 'image/png' : 'image/jpeg');
+                  const { data: upData, error: upErr } = await supabase.storage.from('avatars').upload(filename, arrayBuffer, { upsert: true, contentType });
+                  if (upErr || !upData?.path) { showToast({ message: `Upload failed${upErr?.message ? `: ${upErr.message}` : ''}`, variant: 'error' }); setUploadingAvatar(false); return; }
                   const { data: pub } = supabase.storage.from('avatars').getPublicUrl(upData.path);
                   const publicUrl = pub.publicUrl;
+
                   setProfileImageUrl(publicUrl);
                   const updated = await apiPut('/api/users/profile', { profile_image_url: publicUrl });
                   await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(updated)).catch(()=>{});
-                  showToast({ message: 'Avatar uploaded', variant: 'success' });
-                  setAvatarModalVisible(false);
                 } catch (e: any) {
-                  showToast({ message: 'Upload error', variant: 'error' });
+                  const msg = e?.message || 'Upload error';
+                  showToast({ message: msg, variant: 'error' });
+                } finally {
+                  setUploadingAvatar(false);
                 }
               }}
             >
@@ -204,10 +240,9 @@ export default function AccountInfoScreen({ navigation }: AccountInfoScreenProps
                   onPress={async () => {
                     try {
                       setProfileImageUrl(url);
-                      const updated = await apiPut('/api/users/profile', { profile_image_url: url });
-                      await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(updated)).catch(()=>{});
-                      setAvatarModalVisible(false);
-                      showToast({ message: 'Avatar updated', variant: 'success' });
+                  const updated = await apiPut('/api/users/profile', { profile_image_url: url });
+                  await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(updated)).catch(()=>{});
+                  setAvatarModalVisible(false);
                     } catch {}
                   }}
                 >
@@ -299,6 +334,19 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     backgroundColor: '#f0f0f0',
+  },
+  avatarLoadingOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderRadius: 60,
+    width: 120,
+    height: 120,
   },
   editIcon: {
     position: 'absolute',

@@ -165,6 +165,9 @@ export default function WalletScreen() {
           <View style={styles.transactionSection}>
             <Text style={styles.transactionTitle}>Transaction history</Text>
             <Text style={styles.transactionSubtitle}>Here are your recent transactions on the app.</Text>
+            {/* <TouchableOpacity style={[styles.viewAllBtn, { alignSelf: 'flex-end', marginBottom: 8 }]} onPress={()=>navigation.dispatch(CommonActions.navigate('WithdrawFunds'))}>
+              <Text style={styles.viewAllText}>Withdrawals</Text>
+            </TouchableOpacity> */}
             {transactionsLoading ? (
               renderTxnSkeleton()
             ) : transactions.length === 0 ? (

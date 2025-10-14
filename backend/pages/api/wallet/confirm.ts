@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { verifyAccessToken } from '@/utils/jwt'
 import { supabaseAdmin as supabase } from '@/lib/supabase'
 import stripe from '@/lib/stripe'
+import { createNotification } from '../notifications/templates'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader('Cache-Control', 'no-store');
@@ -81,6 +82,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         meta: { kind: 'platform_fee' }
       })
     }
+
+    // Notify user
+    try {
+      await createNotification(payload.userId, { kind: 'wallet_deposit', amount_cents: net, currency })
+    } catch {}
 
     return res.status(200).json({ success: true, data: { credited: true } })
   } catch (e: any) {

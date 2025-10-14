@@ -50,6 +50,7 @@ import TwoFactorAuthScreen from './screens/profile/TwoFactorAuthScreen';
 import VerifyAccountScreen from './screens/profile/VerifyAccountScreen';
 import NotificationDetailScreen from './screens/notifications/NotificationDetailScreen';
 import InviteLandingScreen from './screens/groups/InviteLandingScreen';
+import LinkAccountScreen from './screens/profile/LinkAccountScreen';
 
 // Import contexts
 import { SupabaseAuthProvider, useAuth } from './contexts/SupabaseAuthContext';
@@ -91,6 +92,7 @@ export type RootStackParamList = {
   TransactionDetail: { txn: any } | undefined;
   Wallet: undefined;
   WalletAndPayment: undefined;
+  LinkAccount: undefined;
   CreateGroup: undefined;
   GroupCreated: undefined;
   AllGroups: undefined;
@@ -304,6 +306,7 @@ function AppNavigator() {
         <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
         <Stack.Screen name="Wallet" component={WalletScreen} />
         <Stack.Screen name="WalletAndPayment" component={WalletAndPaymentScreen} />
+        <Stack.Screen name="LinkAccount" component={LinkAccountScreen} />
         <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
         <Stack.Screen name="GroupCreated" component={GroupCreatedScreen} />
         <Stack.Screen name="AllGroups" component={AllGroupsScreen} />

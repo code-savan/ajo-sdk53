@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { verifyAccessToken } from '@/utils/jwt'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { createNotification } from '../../../notifications/templates'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -75,6 +76,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .from('contributions')
       .upsert({ group_id: groupId, user_id: (payload as any).userId, cycle_number: cycleNumber, amount_cents: amount, status: 'covered', allocated_from_deposit_ids: [] }, { onConflict: 'group_id,user_id,cycle_number' })
     if (contribErr) return res.status(400).json({ success: false, error: contribErr.message })
+
+    try {
+      await createNotification((payload as any).userId, { kind: 'group_funded', group_name: (group as any).name || groupId, amount_cents: amount, currency })
+    } catch {}
 
     return res.status(201).json({ success: true, data: { debited_cents: amount, external_ref: externalRef } })
   } catch (e: any) {
