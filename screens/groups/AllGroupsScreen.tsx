@@ -1,30 +1,87 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Calendar, Users, DollarSign } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiGet } from '../../lib/api';
+import GroupCard from '../../components/GroupCard';
 
 type AllGroupsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function AllGroupsScreen() {
   const navigation = useNavigation<AllGroupsScreenNavigationProp>();
+  const [groups, setGroups] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const CACHE_KEY = 'groups_list_cache_v1';
 
   const handleGoBack = () => {
     navigation.goBack();
   };
 
-  const handleGroupPress = (groupData: any) => {
-    navigation.navigate('GroupDetail', { 
-      groupName: groupData.name,
-      groupId: groupData.id,
-      amount: groupData.amount,
-      memberCount: groupData.memberCount,
-      monthlyContribution: groupData.monthlyContribution,
-      date: groupData.date
+  const handleGroupPress = (g: any) => {
+    navigation.navigate('GroupDetail', {
+      groupName: g.name,
+      groupId: g.id,
+      amount: undefined,
+      memberCount: g.size,
+      monthlyContribution: g.contribution_amount_cents ? `$${(Number(g.contribution_amount_cents)/100).toFixed(0)} / mnth` : undefined,
+      date: g.created_at ? new Date(g.created_at).toLocaleDateString('en-US') : undefined,
     });
   };
+
+  const load = async (useBackground = false) => {
+    if (!useBackground) setLoading(true);
+    try {
+      // Show cache first
+      const cached = await AsyncStorage.getItem(CACHE_KEY);
+      if (cached && !useBackground) {
+        try { setGroups(JSON.parse(cached)); } catch {}
+      }
+      // Fetch fresh
+      const fresh = await apiGet('/api/groups').catch(() => []);
+      if (Array.isArray(fresh)) {
+        setGroups(fresh);
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(fresh)).catch(()=>{});
+      }
+    } finally {
+      if (!useBackground) setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  React.useEffect(() => {
+    const unsub = (navigation as any).addListener?.('focus', () => load(true));
+    load(false);
+    return unsub;
+  }, [navigation]);
+
+  const renderGroup = (g: any, idx: number) => (
+    <GroupCard key={g.id || idx} group={g} onPress={() => handleGroupPress(g)} />
+  );
+
+  const Skeleton = ({ keyIdx }: { keyIdx: number }) => (
+    <View key={`sk-${keyIdx}`} style={styles.groupItem}>
+      <View style={styles.groupContent}>
+        <View style={styles.groupIcon}>
+          <View style={[styles.groupIconBg, { backgroundColor: '#f3f4f6' }]} />
+        </View>
+        <View style={styles.groupInfo}>
+          <View style={{ height: 14, backgroundColor: '#f3f4f6', borderRadius: 6, marginBottom: 8 }} />
+          <View style={{ height: 16, width: 120, backgroundColor: '#f3f4f6', borderRadius: 6, marginBottom: 12 }} />
+          <View style={{ flexDirection: 'row', gap: 16 }}>
+            <View style={{ height: 12, width: 80, backgroundColor: '#f3f4f6', borderRadius: 6 }} />
+            <View style={{ height: 12, width: 40, backgroundColor: '#f3f4f6', borderRadius: 6 }} />
+            <View style={{ height: 12, width: 100, backgroundColor: '#f3f4f6', borderRadius: 6 }} />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -33,137 +90,27 @@ export default function AllGroupsScreen() {
           <ArrowLeft color="#000000" size={24} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My groups</Text>
-        {/* <View style={styles.emptyView} /> */}
       </View>
 
-      <ScrollView style={styles.scrollView}>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(false); }} />}
+      >
         <View style={styles.content}>
-        <Text style={styles.title}>My groups</Text>
+          <Text style={styles.title}>My groups</Text>
           <Text style={styles.subtitle}>Stay in the loop. View all your groups.</Text>
 
-          {/* Hawaii Vacation Group */}
-          <TouchableOpacity 
-            style={styles.groupItem}
-            onPress={() => handleGroupPress({
-              name: 'Hawaii Vacation',
-              id: 'hawaii-vacation',
-              amount: '$1,500.00',
-              memberCount: 15,
-              monthlyContribution: '$100 / mnth',
-              date: '1/07/2025'
-            })}
-          >
-            <View style={styles.groupContent}>
-              <View style={styles.groupIcon}>
-                {/* Simple map-like background with coin icon */}
-                <View style={styles.groupIconBg}>
-                  <View style={styles.iconBadge}>
-                    <Text style={styles.iconBadgeText}>5</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.groupInfo}>
-                <Text style={styles.groupTitle}>Hawaii Vacation</Text>
-                <Text style={styles.groupAmount}>$1,500.00</Text>
-                <View style={styles.groupMeta}>
-                  <View style={styles.metaItem}>
-                    <Calendar width={16} height={16} color="#2563eb" />
-                    <Text style={styles.metaText}>1/07/2025</Text>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <Users width={16} height={16} color="#2563eb" />
-                    <Text style={styles.metaText}>15</Text>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <DollarSign width={16} height={16} color="#2563eb" />
-                    <Text style={styles.metaText}>$100 / mnth</Text>
-                  </View>
-                </View>
-              </View>
+          {loading && groups.length === 0 ? (
+            <>
+              {[0,1,2,3].map(i => <Skeleton keyIdx={i} key={`s-${i}`} />)}
+            </>
+          ) : groups.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+              <Text style={{ color: '#928F8B' }}>No groups yet.</Text>
             </View>
-          </TouchableOpacity>
-
-          {/* Cooking Fees Group */}
-          <TouchableOpacity 
-            style={styles.groupItem}
-            onPress={() => handleGroupPress({
-              name: 'Cooking Fees',
-              id: 'cooking-fees',
-              amount: '$1,000.00',
-              memberCount: 10,
-              monthlyContribution: '$100 / mnth',
-              date: '1/07/2025'
-            })}
-          >
-            <View style={styles.groupContent}>
-              <View style={styles.groupIcon}>
-                <View style={styles.groupIconBg}>
-                  <View style={styles.iconBadge}>
-                    <Text style={styles.iconBadgeText}>5</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.groupInfo}>
-                <Text style={styles.groupTitle}>Cooking Fees</Text>
-                <Text style={styles.groupAmount}>$1,000.00</Text>
-                <View style={styles.groupMeta}>
-                  <View style={styles.metaItem}>
-                    <Calendar width={16} height={16} color="#2563eb" />
-                    <Text style={styles.metaText}>1/07/2025</Text>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <Users width={16} height={16} color="#2563eb" />
-                    <Text style={styles.metaText}>10</Text>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <DollarSign width={16} height={16} color="#2563eb" />
-                    <Text style={styles.metaText}>$100 / mnth</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          {/* TV Prep Group */}
-          <TouchableOpacity 
-            style={styles.groupItem}
-            onPress={() => handleGroupPress({
-              name: 'TV Prep',
-              id: 'tv-prep',
-              amount: '$1,000.00',
-              memberCount: 10,
-              monthlyContribution: '$100 / mnth',
-              date: '1/07/2025'
-            })}
-          >
-            <View style={styles.groupContent}>
-              <View style={styles.groupIcon}>
-                <View style={styles.groupIconBg}>
-                  <View style={styles.iconBadge}>
-                    <Text style={styles.iconBadgeText}>5</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.groupInfo}>
-                <Text style={styles.groupTitle}>TV Prep</Text>
-                <Text style={styles.groupAmount}>$1,000.00</Text>
-                <View style={styles.groupMeta}>
-                  <View style={styles.metaItem}>
-                    <Calendar width={16} height={16} color="#2563eb" />
-                    <Text style={styles.metaText}>1/07/2025</Text>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <Users width={16} height={16} color="#2563eb" />
-                    <Text style={styles.metaText}>10</Text>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <DollarSign width={16} height={16} color="#2563eb" />
-                    <Text style={styles.metaText}>$100 / mnth</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </TouchableOpacity>
+          ) : (
+            groups.map((g, idx) => renderGroup(g, idx))
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

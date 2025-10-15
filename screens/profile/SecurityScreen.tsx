@@ -63,6 +63,16 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ navigation }) => {
                 setIsProcessing(true);
                 try {
                   await disableBiometric();
+                  // Also clear biometric_type in DB
+                  try {
+                    const { supabase } = await import('../../lib/supabase');
+                    if (user?.id) {
+                      await supabase
+                        .from('users')
+                        .update({ biometric_type: null, biometric_enabled: false, updated_at: new Date().toISOString() })
+                        .eq('id', user.id);
+                    }
+                  } catch {}
                   setLocalBiometricEnabled(false);
                   Alert.alert('Success', 'Biometric authentication has been disabled.');
                 } catch (error: any) {
@@ -196,6 +206,14 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ navigation }) => {
 
       console.log('Biometric authentication successful, updating database...');
 
+      // Determine biometric type based on device capabilities
+      let detectedType: 'face_id' | 'fingerprint' | 'biometric' = 'biometric';
+      try {
+        const AuthType: any = (LocalAuth as any).AuthenticationType || {};
+        if (supportedTypes.includes(AuthType.FACIAL_RECOGNITION)) detectedType = 'face_id';
+        else if (supportedTypes.includes(AuthType.FINGERPRINT)) detectedType = 'fingerprint';
+      } catch {}
+
       // Get stored password and save biometric settings
       const storedPassword = await SecureStore.getItemAsync('user_password');
 
@@ -212,7 +230,7 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ navigation }) => {
           .from('users')
           .update({
             biometric_enabled: true,
-            biometric_type: biometricType,
+            biometric_type: detectedType,
             updated_at: new Date().toISOString(),
           })
           .eq('id', user.id);

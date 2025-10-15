@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Calendar, Users, Plus, ChevronDown, ChevronUp, ChevronRight, DollarSign } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -7,6 +7,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import BottomNavigation from '../../components/BottomNavigation';
 import { apiGet } from '../../lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const avatarImageUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=1480";
 
@@ -17,28 +18,57 @@ export default function MainScreen() {
   const [unread, setUnread] = useState<number>(0);
   const [groups, setGroups] = useState<any[]>([]);
   const [txns, setTxns] = useState<any[]>([]);
+  const [hasCache, setHasCache] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
+    const load = async (background = false) => {
+      if (!background) setLoading(true);
       try {
+        // hydrate from cache to avoid flicker
+        const [p, g1, g2, t, u] = await Promise.all([
+          AsyncStorage.getItem('profile_cache_v1'),
+          AsyncStorage.getItem('groups_cache_v1'),
+          AsyncStorage.getItem('groups_list_cache_v1'),
+          AsyncStorage.getItem('main_txns_cache_v1'),
+          AsyncStorage.getItem('main_unread_cache_v1'),
+        ]);
+        let anyCache = false;
+        if (p) {
+          try { const obj = JSON.parse(p); setName(obj?.full_name || (obj?.email ? obj.email.split('@')[0] : '')); anyCache = true; } catch {}
+        }
+        let cachedGroups: any[] = [];
+        if (g1) { try { cachedGroups = JSON.parse(g1) || []; } catch {} }
+        if ((!cachedGroups || cachedGroups.length === 0) && g2) { try { cachedGroups = JSON.parse(g2) || []; } catch {} }
+        if (Array.isArray(cachedGroups) && cachedGroups.length) { setGroups(cachedGroups); anyCache = true; }
+        if (t) { try { const arr = JSON.parse(t) || []; setTxns(Array.isArray(arr) ? arr : []); anyCache = true; } catch {} }
+        if (u) { try { setUnread(Number(JSON.parse(u)||0)); anyCache = true; } catch { setUnread(Number(u)||0); } }
+        setHasCache(anyCache);
+
+        // fetch fresh
         const [profile, notif, grp, txn] = await Promise.all([
           apiGet('/api/users/profile').catch(()=>({})),
           apiGet('/api/notifications?page=1&limit=1&unread_only=true').catch(()=>({ data: { total: 0 } })),
           apiGet('/api/groups').catch(()=>[]),
           apiGet('/api/me/transactions').catch(()=>[]),
         ]);
-        setName(profile?.full_name || (profile?.email ? profile.email.split('@')[0] : ''));
+        const nm = profile?.full_name || (profile?.email ? profile.email.split('@')[0] : '');
+        setName(nm);
+        await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(profile || {})).catch(()=>{});
         const totalUnread = notif?.data?.total ?? notif?.total ?? 0;
         setUnread(Number(totalUnread||0));
-        setGroups(Array.isArray(grp) ? grp : []);
-        setTxns(Array.isArray(txn) ? txn.slice(0,3) : []);
+        await AsyncStorage.setItem('main_unread_cache_v1', JSON.stringify(Number(totalUnread||0))).catch(()=>{});
+        const grpArr = Array.isArray(grp) ? grp : [];
+        setGroups(grpArr);
+        if (grpArr.length) await AsyncStorage.setItem('groups_cache_v1', JSON.stringify(grpArr)).catch(()=>{});
+        const txnArr = Array.isArray(txn) ? txn.slice(0,3) : [];
+        setTxns(txnArr);
+        await AsyncStorage.setItem('main_txns_cache_v1', JSON.stringify(txnArr)).catch(()=>{});
       } finally {
-        setLoading(false);
+        if (!background) setLoading(false);
       }
     };
-    const unsub = navigation.addListener('focus', load);
-    load();
+    const unsub = navigation.addListener('focus', () => load(true));
+    load(false);
     return unsub;
   }, [navigation]);
 
@@ -92,7 +122,11 @@ export default function MainScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
-          <Text style={styles.headerText}>{`Welcome${name?`, ${name}.`:`.`}`}</Text>
+          {loading && !hasCache && !name ? (
+            <View style={styles.skelHeaderBar} />
+          ) : (
+            <Text style={styles.headerText}>{`Welcome${name?`, ${name}.`:`.`}`}</Text>
+          )}
           <TouchableOpacity onPress={handleNotificationsPress}>
             <Bell color="#111827" size={24} />
             {unread > 0 && (
@@ -105,29 +139,57 @@ export default function MainScreen() {
 
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardHeaderText}>Credit score health: <Text style={styles.goodText}>Good.</Text></Text>
+            {loading && !hasCache ? (
+              <View style={{ height: 12, width: 180, backgroundColor: '#E5E7EB', borderRadius: 6 }} />
+            ) : (
+              <Text style={styles.cardHeaderText}>Credit score health: <Text style={styles.goodText}>Good.</Text></Text>
+            )}
             <TouchableOpacity>
-              <Text style={styles.viewInfoText}>View info</Text>
+              {loading && !hasCache ? (
+                <View style={{ height: 12, width: 60, backgroundColor: '#E5E7EB', borderRadius: 6 }} />
+              ) : (
+                <Text style={styles.viewInfoText}>View info</Text>
+              )}
             </TouchableOpacity>
           </View>
           <View style={styles.cardInfo}>
-
-          <Text style={styles.expectedAmountLabel}>Expected Amount</Text>
-          <Text style={styles.expectedAmount}>{(expectedAmount || 0).toLocaleString('en-US',{style:'currency',currency:'USD'})}</Text>
+          {loading && !hasCache ? (
+            <>
+              <View style={{ height: 12, width: 120, backgroundColor: '#E5E7EB', borderRadius: 6, marginBottom: 8 }} />
+              <View style={{ height: 40, width: 180, backgroundColor: '#E5E7EB', borderRadius: 8 }} />
+            </>
+          ) : (
+            <>
+              <Text style={styles.expectedAmountLabel}>Expected Amount</Text>
+              <Text style={styles.expectedAmount}>{(expectedAmount || 0).toLocaleString('en-US',{style:'currency',currency:'USD'})}</Text>
+            </>
+          )}
           </View>
           <View style={styles.cardBottom}>
           <View style={styles.divider} />
           <View style={styles.cardFooter}>
-            <View style={styles.nextPickDate}>
-              <Calendar color="#3358FF" size={16} />
-              <Text style={styles.nextPickDateText}>Next Pick: {nextPick}</Text>
-            </View>
-            <View style={styles.groupImages}>
-              {groupCount === 0 ? null : groups.slice(0,3).map((g:any, index:number) => (
-                <Image key={g.id} source={{uri: avatarImageUrl}} style={[styles.groupImage, { marginLeft: index > 0 ? -10 : 0 }]} />
-              ))}
-              <Text style={styles.groupCount}>{groupCount === 0 ? 'no Groups' : `${Math.min(groupCount, 99)} Groups`}</Text>
-            </View>
+            {loading && !hasCache ? (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <View style={{ height: 12, width: 140, backgroundColor: '#E5E7EB', borderRadius: 6 }} />
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {[0,1,2].map(i=> (<View key={i} style={[styles.groupImage, { marginLeft: i>0?-10:0, backgroundColor: '#E5E7EB' }]} />))}
+                  <View style={{ height: 14, width: 60, backgroundColor: '#E5E7EB', borderRadius: 6, marginLeft: 8 }} />
+                </View>
+              </View>
+            ) : (
+              <>
+                <View style={styles.nextPickDate}>
+                  <Calendar color="#3358FF" size={16} />
+                  <Text style={styles.nextPickDateText}>Next Pick: {nextPick}</Text>
+                </View>
+                <View style={styles.groupImages}>
+                  {groupCount === 0 ? null : groups.slice(0,3).map((g:any, index:number) => (
+                    <Image key={g.id} source={{uri: avatarImageUrl}} style={[styles.groupImage, { marginLeft: index > 0 ? -10 : 0 }]} />
+                  ))}
+                  <Text style={styles.groupCount}>{groupCount === 0 ? 'no Groups' : `${Math.min(groupCount, 99)} Groups`}</Text>
+                </View>
+              </>
+            )}
           </View>
           </View>
         </View>
@@ -170,7 +232,7 @@ export default function MainScreen() {
                   id: g.id,
                   amount: (g.goal_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()}),
                   memberCount: g.size,
-                  monthlyContribution: `${(g.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()})} / ${g.frequency}`,
+                  monthlyContribution: `${(g.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()})} / ${String(g.frequency||'').toLowerCase().includes('month')?'M':String(g.frequency||'').toLowerCase().includes('week')?'W':String(g.frequency||'').toLowerCase().includes('day')?'D':String(g.frequency||'').toLowerCase().includes('biweek')?'BW':String(g.frequency||'').toLowerCase().includes('quarter')?'Q':String(g.frequency||'').toLowerCase().includes('year')?'Y':(String(g.frequency||'').charAt(0).toUpperCase())}`,
                   date: g.next_charge_at ? new Date(g.next_charge_at).toLocaleDateString() : '-'
                 })}
               >
@@ -290,6 +352,7 @@ const styles = StyleSheet.create({
     fontWeight: 'medium',
     color: '#111827',
   },
+  skelHeaderBar: { height: 20, width: 160, backgroundColor: '#E5E7EB', borderRadius: 6 },
   notificationBadge: {
     position: 'absolute',
     top: -4,

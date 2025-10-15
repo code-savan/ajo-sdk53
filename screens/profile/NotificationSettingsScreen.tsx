@@ -6,6 +6,7 @@ import { RootStackParamList } from '../../App';
 import { ChevronLeft } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiGet, apiPut } from '../../lib/api';
+import { apiPost } from '../../lib/api';
 import { useToast } from '../../contexts/ToastContext';
 
 // Define navigation prop types
@@ -96,6 +97,42 @@ const NotificationSettingsScreen: React.FC<NotificationSettingsScreenProps> = ({
           value={pushNotifications}
         />
       </View>
+
+      <TouchableOpacity
+        onPress={async () => {
+          try {
+            const Notifications = await import('expo-notifications');
+            const Device = await import('expo-device');
+            const Constants = await import('expo-constants');
+            const { status: existingStatus } = await (Notifications as any).getPermissionsAsync();
+            let finalStatus = existingStatus;
+            if (existingStatus !== 'granted') {
+              const { status } = await (Notifications as any).requestPermissionsAsync();
+              finalStatus = status;
+            }
+            if (finalStatus !== 'granted') {
+              showToast({ message: 'Notification permission not granted', variant: 'error' });
+              return;
+            }
+            const projectId = (Constants as any)?.expoConfig?.extra?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
+            const tokenResponse = await (Notifications as any).getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+            const expoToken = tokenResponse?.data;
+            if (!expoToken) {
+              showToast({ message: 'Failed to get push token', variant: 'error' });
+              return;
+            }
+            const device_id = (Device as any).osBuildId || (Constants as any)?.deviceId || expoToken;
+            const platform = (Device as any).platform || 'unknown';
+            await apiPost('/api/notifications/register-device', { expo_push_token: expoToken, platform, device_id });
+            showToast({ message: 'Device registered for push', variant: 'success' });
+          } catch (e: any) {
+            showToast({ message: 'Device registration failed', variant: 'error' });
+          }
+        }}
+        style={{ paddingVertical: 16 }}
+      >
+        <Text style={{ color: '#2563eb' }}>Test push registration</Text>
+      </TouchableOpacity>
 
       <View style={styles.option}>
         <View style={styles.optionContent}>

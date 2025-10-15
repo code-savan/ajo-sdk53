@@ -9,6 +9,7 @@ import { makeRedirectUri } from 'expo-auth-session';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiGet } from '../lib/api';
+import { apiPost } from '../lib/api';
 
 interface ExtendedUser extends User {
   hasPin?: boolean;
@@ -82,6 +83,7 @@ const STORAGE_KEYS = {
 };
 
 const MAX_PIN_ATTEMPTS = 3;
+const SUPABASE_TOKEN_STORAGE_KEY = 'sb-cpvgznbnczuqzmyvaxdo-auth-token';
 
 export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<ExtendedUser | null>(null);
@@ -180,10 +182,88 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
 
         // Handle session events
         if (event === 'SIGNED_IN') {
+          if (__DEV__) console.log('Auth listener (primary): SIGNED_IN, attempting push registration');
           // Store session token in SecureStore for extra security if needed
           if (session?.access_token) {
             await SecureStore.setItemAsync('supabase_access_token', session.access_token);
           }
+          // Attempt to register for push notifications (best-effort)
+          try {
+            // Dynamically import to avoid build issues if not available on web
+            const Notifications = await import('expo-notifications');
+            const Device = await import('expo-device');
+            const Constants = await import('expo-constants');
+            if ((Device as any).isDevice) {
+              const { status: existingStatus } = await (Notifications as any).getPermissionsAsync();
+              if (__DEV__) console.log('Push permission existingStatus', existingStatus);
+              let finalStatus = existingStatus;
+              if (existingStatus !== 'granted') {
+                const { status } = await (Notifications as any).requestPermissionsAsync();
+                if (__DEV__) console.log('Push permission requested ->', status);
+                finalStatus = status;
+              }
+              if (finalStatus === 'granted') {
+                const projectId = (Constants as any)?.expoConfig?.extra?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
+                if (__DEV__) console.log('Using projectId for token', projectId);
+                const tokenResponse = await (Notifications as any).getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+                if (__DEV__) console.log('Expo push token response', tokenResponse);
+                const expoToken = tokenResponse?.data;
+                if (expoToken) {
+                  const device_id = (Device as any).osBuildId || (Constants as any)?.deviceId || expoToken;
+                  const platform = (Device as any).platform || 'unknown';
+                  if (__DEV__) {
+                    console.log('Registering device for push', { projectId, expoToken, platform, device_id });
+                  }
+                  try {
+                    const resp = await apiPost('/api/notifications/register-device', { expo_push_token: expoToken, platform, device_id });
+                    if (__DEV__) console.log('Device registration response', resp);
+                  } catch (e) {
+                    if (__DEV__) console.warn('Device registration failed', e);
+                  }
+                }
+              }
+            }
+          } catch (e) { if (__DEV__) console.warn('Push registration error (SIGNED_IN)', e); }
+        } else if (event === 'INITIAL_SESSION' && !session) {
+          // Stale/invalid stored tokens on cold start: clear and stop
+          try {
+            await AsyncStorage.removeItem(SUPABASE_TOKEN_STORAGE_KEY).catch(()=>{});
+            await AsyncStorage.multiRemove(['backend_jwt','backend_jwt_expires_at']).catch(()=>{});
+          } catch {}
+          setSession(null);
+          setUser(null);
+        } else if ((event as any) === 'TOKEN_REFRESHED') {
+          if (__DEV__) console.log('Auth listener (primary): TOKEN_REFRESHED, attempting push registration');
+          // Also try to register after token refresh to catch cold-start sessions
+          try {
+            const Notifications = await import('expo-notifications');
+            const Device = await import('expo-device');
+            const Constants = await import('expo-constants');
+            if ((Device as any).isDevice) {
+              const { status: existingStatus } = await (Notifications as any).getPermissionsAsync();
+              if (__DEV__) console.log('Push permission existingStatus (refresh)', existingStatus);
+              let finalStatus = existingStatus;
+              if (existingStatus !== 'granted') {
+                const { status } = await (Notifications as any).requestPermissionsAsync();
+                if (__DEV__) console.log('Push permission requested (refresh) ->', status);
+                finalStatus = status;
+              }
+              if (finalStatus === 'granted') {
+                const projectId = (Constants as any)?.expoConfig?.extra?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
+                const tokenResponse = await (Notifications as any).getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+                const expoToken = tokenResponse?.data;
+                if (expoToken) {
+                  const device_id = (Device as any).osBuildId || (Constants as any)?.deviceId || expoToken;
+                  const platform = (Device as any).platform || 'unknown';
+                  if (__DEV__) console.log('Registering device for push (refresh)', { projectId, expoToken, platform, device_id });
+                  try {
+                    const resp = await apiPost('/api/notifications/register-device', { expo_push_token: expoToken, platform, device_id });
+                    if (__DEV__) console.log('Device registration response (refresh)', resp);
+                  } catch (e) { if (__DEV__) console.warn('Device registration failed (refresh)', e); }
+                }
+              }
+            }
+          } catch (e) { if (__DEV__) console.warn('Push registration error (TOKEN_REFRESHED)', e); }
         } else if (event === 'SIGNED_OUT') {
           // Clear stored tokens but preserve PIN/biometric settings unless explicitly cleared
           await SecureStore.deleteItemAsync('supabase_access_token');
@@ -197,7 +277,7 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         // Clear any auth errors on successful state changes
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || (event === 'INITIAL_SESSION' && !!session)) {
           setError(null);
         }
       } catch (err) {
@@ -261,8 +341,16 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) {
         console.error('Session check error:', error);
         // For refresh token errors, don't throw - just clear the session
-        if (error.message?.includes('refresh token') || error.message?.includes('Refresh Token')) {
-          console.log('Refresh token expired, clearing session');
+        const msg = (error.message || '').toLowerCase();
+        if (msg.includes('refresh token')) {
+          console.log('Refresh token invalid/expired, clearing stored session');
+          try {
+            await supabase.auth.signOut();
+          } catch {}
+          try {
+            await AsyncStorage.removeItem(SUPABASE_TOKEN_STORAGE_KEY).catch(()=>{});
+            await AsyncStorage.multiRemove(['backend_jwt','backend_jwt_expires_at']).catch(()=>{});
+          } catch {}
           setSession(null);
           setUser(null);
           return;

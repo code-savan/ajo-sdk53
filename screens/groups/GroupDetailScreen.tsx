@@ -234,7 +234,7 @@ export default function GroupDetailScreen() {
               {[1,2,3].map(i => (
                 <View key={i} style={styles.activityItem}>
                   <View style={styles.avatar}><View style={{flex:1,backgroundColor:'#E5E7EB',borderRadius:20}} /></View>
-                  <View style={styles.activityInfo}>
+            <View style={styles.activityInfo}>
                     <View style={{ width: 120, height: 14, backgroundColor: '#E5E7EB', borderRadius: 6, marginBottom: 6 }} />
                     <View style={{ width: 80, height: 12, backgroundColor: '#E5E7EB', borderRadius: 6 }} />
                   </View>
@@ -278,8 +278,8 @@ export default function GroupDetailScreen() {
                     <View style={styles.activityInfo}>
                       <Text style={styles.personName}>{name}</Text>
                       <Text style={styles.actionText}>{subtitle}</Text>
-                    </View>
-                    <View style={styles.amountInfo}>
+            </View>
+            <View style={styles.amountInfo}>
                       <Text style={[styles.amountPositive]}>{amountStr}</Text>
                       <Text style={styles.timeText}>{timeStr}</Text>
                     </View>
@@ -305,7 +305,7 @@ export default function GroupDetailScreen() {
             <View style={styles.memberInfo}>
               <Text style={styles.memberName}>{summary?.owner_name || 'You'}</Text>
               <Text style={styles.memberRole}>Group Admin</Text>
-            </View>
+          </View>
             <ChevronRight width={18} height={18} color="#4B5563" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.invitePill} onPress={handleInviteMember}>

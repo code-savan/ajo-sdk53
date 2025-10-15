@@ -25,6 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const pi = await stripe.paymentIntents.retrieve(payment_intent_id)
+    console.log('[wallet/confirm] fetched PI', { id: pi.id, status: pi.status, amount: pi.amount, currency: pi.currency })
     if (pi.status !== 'succeeded') {
       return res.status(200).json({ success: true, data: { status: pi.status } })
     }
@@ -86,6 +87,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Notify user
     try {
       await createNotification(payload.userId, { kind: 'wallet_deposit', amount_cents: net, currency })
+      console.log('[wallet/confirm] notification queued', { user_id: payload.userId, net, currency })
     } catch {}
 
     return res.status(200).json({ success: true, data: { credited: true } })

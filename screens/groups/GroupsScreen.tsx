@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, ChevronRight, Calendar, Users, DollarSign } from 'lucide-react-native';
+import { Bell, ChevronRight } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import BottomNavigation from '../../components/BottomNavigation';
 import { apiGet } from '../../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import GroupCard from '../../components/GroupCard';
 
 export default function GroupsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -164,35 +165,7 @@ export default function GroupsScreen() {
               <Text style={styles.emptyText}>No groups yet. Create your first group to get started.</Text>
             ) : (
               groups.map((g) => (
-                <TouchableOpacity
-                  key={g.id}
-                  style={styles.groupItem}
-                  onPress={() => handleGroupPress(g.name, g.id, undefined, g.size, `${(g.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()})} / ${g.frequency}`, undefined)}
-                >
-                  <View style={styles.groupContent}>
-                    <View style={styles.groupIcon}>
-                      <View style={styles.groupIconBg} />
-                    </View>
-                    <View style={styles.groupInfo}>
-                      <Text style={styles.groupTitle}>{g.name}</Text>
-                      <Text style={styles.groupAmount}>{(g.goal_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()})}</Text>
-                      <View style={styles.groupMeta}>
-                        <View style={styles.metaItem}>
-                          <Calendar width={16} height={16} color="#2563eb" />
-                          <Text style={styles.metaText}>{g.next_charge_at ? new Date(g.next_charge_at).toLocaleDateString() : '-'}</Text>
-                        </View>
-                        <View style={styles.metaItem}>
-                          <Users width={16} height={16} color="#2563eb" />
-                          <Text style={styles.metaText}>{g.size}</Text>
-                        </View>
-                        <View style={styles.metaItem}>
-                          <DollarSign width={16} height={16} color="#2563eb" />
-                          <Text style={styles.metaText}>{(g.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()})}</Text>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                </TouchableOpacity>
+                <GroupCard key={g.id} group={g} onPress={() => handleGroupPress(g.name, g.id, undefined, g.size, `${(g.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:(g.currency||'USD').toUpperCase()})} `, undefined)} />
               ))
             )}
 

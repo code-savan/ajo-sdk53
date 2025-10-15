@@ -5,7 +5,7 @@ import { ArrowLeft, CheckCircle, AlertCircle, InfoIcon, Calendar } from 'lucide-
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
-import { apiGet } from '../../lib/api';
+import { apiGet, apiPut } from '../../lib/api';
 import { useToast } from '../../contexts/ToastContext';
 
 type NotificationsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -57,8 +57,16 @@ export default function NotificationsScreen() {
   const news = items.filter(n => !n.read);
   const earlier = items.filter(n => n.read);
 
-  const handleOpen = (n: any) => {
-    navigation.navigate('NotificationDetail' as never, { notification: { id: n.id, title: n.title, message: n.message, type: n.type } } as never);
+  const markAsRead = async (id: string) => {
+    try {
+      await apiPut(`/api/notifications/${id}/read`, {});
+      setItems(prev => prev.map(i => i.id === id ? { ...i, read: true } : i));
+    } catch {}
+  };
+
+  const handleOpen = async (n: any) => {
+    if (!n.read) await markAsRead(n.id);
+    navigation.navigate('NotificationDetail' as never, { notification: { id: n.id, title: n.title, message: n.message, type: n.type, data: n.data, created_at: n.created_at } } as never);
   };
 
   return (
@@ -93,6 +101,9 @@ export default function NotificationsScreen() {
                       <Text style={styles.notificationTime}>{new Date(n.created_at).toLocaleString()}</Text>
                     </View>
                     <Text style={styles.notificationMessage}>{n.message}</Text>
+                    {Array.isArray(n?.data?.via) && n.data.via.length > 0 ? (
+                      <Text style={{ marginTop: 4, fontSize: 10, color: '#6b7280' }}>via: {n.data.via.join(', ')}</Text>
+                    ) : null}
                   </View>
                 </TouchableOpacity>
               ))}
@@ -113,6 +124,9 @@ export default function NotificationsScreen() {
                       <Text style={styles.notificationTime}>{new Date(n.created_at).toLocaleString()}</Text>
                     </View>
                     <Text style={styles.notificationMessage}>{n.message}</Text>
+                    {Array.isArray(n?.data?.via) && n.data.via.length > 0 ? (
+                      <Text style={{ marginTop: 4, fontSize: 10, color: '#6b7280' }}>via: {n.data.via.join(', ')}</Text>
+                    ) : null}
                   </View>
                 </TouchableOpacity>
               ))}

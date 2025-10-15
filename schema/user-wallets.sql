@@ -45,6 +45,21 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
 
+-- User Devices for Push (No RLS)
+CREATE TABLE IF NOT EXISTS user_devices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  device_id TEXT,
+  platform TEXT,
+  expo_push_token TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_devices_user_device ON user_devices(user_id, device_id);
+CREATE INDEX IF NOT EXISTS idx_user_devices_user ON user_devices(user_id);
+
 -- User Withdrawals (No RLS)
 CREATE TABLE IF NOT EXISTS user_withdrawals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

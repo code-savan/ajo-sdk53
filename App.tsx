@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 
 // Import screens
 import SplashScreenComponent from './screens/splash/SplashScreen';
@@ -137,6 +138,15 @@ const navigationRef = createNavigationContainerRef<RootStackParamList>();
 // Keep splash screen visible while loading
 SplashScreen.preventAutoHideAsync();
 
+// Show notifications when app is foregrounded
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 // Configure deep linking
 const linking = {
   prefixes: [Linking.createURL('/'), 'ajo://'],
@@ -178,6 +188,20 @@ function AppNavigator() {
   const [hasSetInitialRoute, setHasSetInitialRoute] = useState(false);
   const [pendingRoute, setPendingRoute] = useState<keyof RootStackParamList | null>(null);
   const [mustVerify, setMustVerify] = useState(false);
+
+  // Listen for notifications and responses (debug and navigation)
+  useEffect(() => {
+    const subReceived = Notifications.addNotificationReceivedListener((n: any) => {
+      console.log('Notification received (fg):', n.request.content);
+    });
+    const subResponse = Notifications.addNotificationResponseReceivedListener((resp: any) => {
+      console.log('Notification response:', resp.notification.request.content);
+    });
+    return () => {
+      subReceived.remove();
+      subResponse.remove();
+    };
+  }, []);
 
   // Initialize app (show splash ~3s, then decide route)
   useEffect(() => {

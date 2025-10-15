@@ -1,4 +1,6 @@
 import { supabaseAdmin as supabase } from '@/lib/supabase'
+import { sendExpoPush } from '@/lib/push'
+import { sendEmail } from '@/lib/email'
 
 export type NotificationTemplate =
   | { kind: 'wallet_deposit'; amount_cents: number; currency: string }
@@ -40,5 +42,49 @@ export async function createNotification(userId: string, t: NotificationTemplate
       break
   }
 
-  await supabase.from('notifications').insert({ user_id: userId, title, message, type, data: extra || {}, read: false })
+  // Create notification row and capture id
+  const baseData: any = { ...(extra || {}), via: [] }
+  const { data: inserted } = await supabase
+    .from('notifications')
+    .insert({ user_id: userId, title, message, type, data: baseData, read: false })
+    .select('id, data')
+    .single()
+
+  // Fire-and-forget Expo push
+  try {
+    const { data: tokens } = await supabase
+      .from('user_devices')
+      .select('expo_push_token')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+    const valid = (tokens || []).map((r: any) => r.expo_push_token).filter((t: any) => typeof t === 'string' && t.startsWith('ExponentPushToken'))
+    if (valid.length) {
+      await sendExpoPush(valid, title, message, { type, ...extra })
+      try {
+        if (inserted?.id) {
+          const newVia = Array.isArray(inserted.data?.via) ? [...inserted.data.via, 'push'] : ['push']
+          await supabase.from('notifications').update({ data: { ...(inserted.data || {}), via: newVia } }).eq('id', inserted.id)
+        }
+      } catch {}
+    }
+  } catch {}
+
+  // Email (honor user preference if available)
+  try {
+    const { data: pref } = await supabase
+      .from('users')
+      .select('email, email_notifications')
+      .eq('id', userId)
+      .single()
+    if (pref?.email && (pref.email_notifications !== false)) {
+      const html = `<h3>${title}</h3><p>${message}</p>`
+      const resp = await sendEmail(pref.email, title, html)
+      try {
+        if (resp?.success && inserted?.id) {
+          const newVia = Array.isArray(inserted.data?.via) ? [...inserted.data.via, 'email'] : ['email']
+          await supabase.from('notifications').update({ data: { ...(inserted.data || {}), via: newVia } }).eq('id', inserted.id)
+        }
+      } catch {}
+    }
+  } catch {}
 }
