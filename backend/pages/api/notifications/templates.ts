@@ -12,43 +12,52 @@ export type NotificationTemplate =
 export async function createNotification(userId: string, t: NotificationTemplate, extra?: any) {
   let title = ''
   let message = ''
-  let type = 'info'
+  let uiType = 'info' // for client rendering
+  let dbType: 'contribution_reminder' | 'payout_available' | 'group_invite' | 'transaction_update' | 'general' = 'general'
 
   switch (t.kind) {
     case 'wallet_deposit':
       title = 'Wallet funded'
       message = `Your wallet was funded with ${(t.amount_cents/100).toLocaleString('en-US',{style:'currency',currency:t.currency.toUpperCase()})}.`
-      type = 'success'
+      uiType = 'success'
+      dbType = 'transaction_update'
       break
     case 'group_created':
       title = 'Group created'
       message = `Your group “${t.group_name}” has been created.`
-      type = 'success'
+      uiType = 'success'
+      dbType = 'general'
       break
     case 'group_funded':
       title = 'Contribution paid'
       message = `You paid ${(t.amount_cents/100).toLocaleString('en-US',{style:'currency',currency:t.currency.toUpperCase()})} to “${t.group_name}”.`
-      type = 'success'
+      uiType = 'success'
+      dbType = 'transaction_update'
       break
     case 'withdrawal':
       title = 'Withdrawal requested'
       message = `Your withdrawal of ${(t.amount_cents/100).toLocaleString('en-US',{style:'currency',currency:t.currency.toUpperCase()})} is being processed.`
-      type = 'info'
+      uiType = 'info'
+      dbType = 'transaction_update'
       break
     case 'withdrawal_succeeded':
       title = 'Withdrawal completed'
       message = `Your withdrawal of ${(t.amount_cents/100).toLocaleString('en-US',{style:'currency',currency:t.currency.toUpperCase()})} has been completed.`
-      type = 'success'
+      uiType = 'success'
+      dbType = 'transaction_update'
       break
   }
 
   // Create notification row and capture id
-  const baseData: any = { ...(extra || {}), via: [] }
-  const { data: inserted } = await supabase
+  const baseData: any = { ...(extra || {}), via: [], ui_type: uiType, kind: (t as any).kind }
+  const { data: inserted, error: insErr } = await supabase
     .from('notifications')
-    .insert({ user_id: userId, title, message, type, data: baseData, read: false })
+    .insert({ user_id: userId, title, message, type: dbType, data: baseData, read: false })
     .select('id, data')
     .single()
+  if (insErr) {
+    console.warn('[notifications] insert failed', insErr.message)
+  }
 
   // Fire-and-forget Expo push
   try {
@@ -59,7 +68,14 @@ export async function createNotification(userId: string, t: NotificationTemplate
       .eq('status', 'active')
     const valid = (tokens || []).map((r: any) => r.expo_push_token).filter((t: any) => typeof t === 'string' && t.startsWith('ExponentPushToken'))
     if (valid.length) {
-      await sendExpoPush(valid, title, message, { type, ...extra })
+      await sendExpoPush(valid, title, message, {
+        type: uiType,
+        ...extra,
+        notification_id: inserted?.id,
+        title,
+        message,
+        created_at: new Date().toISOString(),
+      })
       try {
         if (inserted?.id) {
           const newVia = Array.isArray(inserted.data?.via) ? [...inserted.data.via, 'push'] : ['push']

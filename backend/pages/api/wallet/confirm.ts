@@ -86,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Notify user
     try {
-      await createNotification(payload.userId, { kind: 'wallet_deposit', amount_cents: net, currency })
+      await createNotification(payload.userId, { kind: 'wallet_deposit', amount_cents: net, currency }, { external_ref: payment_intent_id, source: 'deposit' })
       console.log('[wallet/confirm] notification queued', { user_id: payload.userId, net, currency })
     } catch {}
 

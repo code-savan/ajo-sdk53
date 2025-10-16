@@ -91,29 +91,36 @@ export default function GroupDetailScreen() {
     let unsub: any = null;
     const load = async (fromFocus = false) => {
       try {
-        if (!fromFocus) {
-          // Try cache first
+        // Always try cache first (even on focus) to avoid skeletons
+        try {
           const cached = await AsyncStorage.getItem(CACHE_KEY);
           if (cached) {
             try { setSummary(JSON.parse(cached)); } catch {}
             setLoading(false);
           }
-        }
+        } catch {}
         // Always refresh in background
         if (!fromFocus && !summary) setLoading(true); else setRefreshing(true);
         const data = await apiGet(`/api/groups/${groupId}/summary`);
         setSummary(data);
         await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data)).catch(()=>{});
-        // Load recent activities (top 3)
+        // Load recent activities (top 3) with cache-first and accurate loading state
+        const ACT_CACHE = `group_activities_${groupId}`;
+        let hadCache = false;
         try {
-          const ACT_CACHE = `group_activities_${groupId}`;
           const cachedActs = await AsyncStorage.getItem(ACT_CACHE);
           if (cachedActs) {
-            try { setActivities(JSON.parse(cachedActs)); } catch {}
-            setActivitiesLoading(false);
-          } else {
-            setActivitiesLoading(true);
+            try {
+              const arr = JSON.parse(cachedActs);
+              if (Array.isArray(arr) && arr.length > 0) {
+                setActivities(arr);
+                hadCache = true;
+              }
+            } catch {}
           }
+        } catch {}
+        setActivitiesLoading(!hadCache);
+        try {
           const acts = await apiGet(`/api/groups/${groupId}/activities?limit=3`).catch(()=>[]);
           const arr = Array.isArray(acts) ? acts : [];
           setActivities(arr);

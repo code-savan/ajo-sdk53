@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, ChevronRight } from 'lucide-react-native';
+import NotificationBell from '../../components/NotificationBell';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
@@ -18,6 +19,7 @@ export default function GroupsScreen() {
   const [activeCount, setActiveCount] = useState<number>(0);
   const [pickupCount, setPickupCount] = useState<number>(0);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [unread, setUnread] = useState<number>(0);
 
   useEffect(() => {
     const CACHE_KEY = 'groups_cache_v1';
@@ -37,9 +39,10 @@ export default function GroupsScreen() {
           }
         }
         if (!fromFocus && groups.length === 0) setLoading(true); else setRefreshing(true);
-        const [groupData, txns] = await Promise.all([
+        const [groupData, txns, notif] = await Promise.all([
           apiGet<any[]>('/api/groups').catch(() => []),
           apiGet<any[]>('/api/me/transactions?limit=500').catch(() => []),
+          apiGet('/api/notifications?page=1&limit=1&unread_only=true').catch(()=>({ data: { total: 0 } })),
         ]);
         const grp = Array.isArray(groupData) ? groupData : [];
         setGroups(grp);
@@ -50,6 +53,8 @@ export default function GroupsScreen() {
         const t = Array.isArray(txns) ? txns : [];
         const pickups = t.filter((r: any) => r?.source === 'rotation_earning' && r?.direction === 'credit').length;
         setPickupCount(pickups);
+        const totalUnread = (notif as any)?.data?.total ?? (notif as any)?.total ?? 0;
+        setUnread(Number(totalUnread||0));
       } catch (e: any) {
         setError('Failed to load groups');
       } finally {
@@ -95,11 +100,7 @@ export default function GroupsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>My Groups</Text>
-          <View style={styles.notificationContainer}>
-            <TouchableOpacity style={styles.notificationButton} onPress={handleNotificationsPress}>
-              <Bell width={24} height={24} color="#6b7280" />
-            </TouchableOpacity>
-          </View>
+          <View style={styles.notificationContainer}><NotificationBell /></View>
         </View>
 
         {/* Content */}
@@ -212,6 +213,8 @@ const styles = StyleSheet.create({
   notificationButton: {
     position: 'relative',
   },
+  notificationBadge: { position: 'absolute', top: -2, right: -2, backgroundColor: '#ef4444', borderRadius: 8, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
+  notificationText: { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
   content: {
     flex: 1,
     paddingHorizontal: 20,
@@ -336,10 +339,19 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   viewAllButton: {
+    width: '80%',
     alignSelf: 'center',
-    marginTop: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 20,
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 16,
   },
   viewAllText: {
-    color: '#2563eb',
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#374151',
   },
 });

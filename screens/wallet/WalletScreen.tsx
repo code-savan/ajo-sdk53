@@ -6,6 +6,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import BottomNavigation from '../../components/BottomNavigation';
 import { Bell, Settings, ChevronDown, ChevronUp } from 'lucide-react-native';
+import NotificationBell from '../../components/NotificationBell';
 import { apiGet, apiPost } from '../../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../lib/supabase';
@@ -18,6 +19,7 @@ export default function WalletScreen() {
   const [pendingCents, setPendingCents] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [transactionsLoading, setTransactionsLoading] = useState(true);
+  const [unread, setUnread] = useState<number>(0);
 
   useEffect(() => {
     const load = async () => {
@@ -40,6 +42,19 @@ export default function WalletScreen() {
       setTransactionsLoading(!hadCache)
 
       try {
+        // Hydrate balance/pending from cache immediately to avoid showing 0
+        try {
+          const [balCache, pendCache] = await Promise.all([
+            AsyncStorage.getItem('wallet_balance_cache_v1'),
+            AsyncStorage.getItem('wallet_pending_cache_v1')
+          ])
+          if (balCache) {
+            try { setBalanceCents(Number(JSON.parse(balCache)||0)); } catch { setBalanceCents(Number(balCache)||0); }
+          }
+          if (pendCache) {
+            try { setPendingCents(Number(JSON.parse(pendCache)||0)); } catch { setPendingCents(Number(pendCache)||0); }
+          }
+        } catch {}
         // Always refresh balance/pending
         const [balance, pending] = await Promise.all([
           apiGet('/api/wallet/balance').catch(()=>({ balanceCents: 0 })),
@@ -47,6 +62,24 @@ export default function WalletScreen() {
         ]);
         setBalanceCents(Number(balance?.balanceCents || 0));
         setPendingCents(Number((pending as any)?.pending_cents || 0));
+        try {
+          await AsyncStorage.setItem('wallet_balance_cache_v1', JSON.stringify(Number(balance?.balanceCents || 0)));
+          await AsyncStorage.setItem('wallet_pending_cache_v1', JSON.stringify(Number((pending as any)?.pending_cents || 0)));
+        } catch {}
+
+        // Unread notifications (hydrate from cache first)
+        try {
+          const cachedUnread = await AsyncStorage.getItem('main_unread_cache_v1');
+          if (cachedUnread) {
+            try { setUnread(Number(JSON.parse(cachedUnread) || 0)); } catch { setUnread(Number(cachedUnread)||0); }
+          }
+        } catch {}
+        try {
+          const notif = await apiGet('/api/notifications?page=1&limit=1&unread_only=true').catch(()=>({ data: { total: 0 } }));
+          const totalUnread = (notif?.data?.total ?? notif?.total ?? 0) as number;
+          setUnread(Number(totalUnread||0));
+          await AsyncStorage.setItem('main_unread_cache_v1', JSON.stringify(Number(totalUnread||0))).catch(()=>{});
+        } catch {}
 
         // Incremental fetch
         const latest = (transactions && transactions.length>0) ? transactions[0].occurred_at : undefined
@@ -140,9 +173,7 @@ export default function WalletScreen() {
               <TouchableOpacity style={styles.settingsButton} onPress={handleWalletAndPaymentPress}>
                 <Settings width={22} height={22} color="#4D4845" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.notificationContainer} onPress={handleNotificationsPress}>
-                <Bell width={24} height={24} color="#4D4845" />
-              </TouchableOpacity>
+              <NotificationBell />
             </View>
           </View>
 
@@ -196,6 +227,8 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   settingsButton: { padding: 4 },
   notificationContainer: { padding: 4 },
+  notificationBadge: { position: 'absolute', top: -2, right: -2, backgroundColor: '#ef4444', borderRadius: 8, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
+  notificationText: { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
   title: { fontSize: 14, fontWeight: '500', color: '#4D4845' },
 
   balanceLabel: { textAlign: 'center', fontSize: 18, color: '#A3A3A3', marginTop: 16 },

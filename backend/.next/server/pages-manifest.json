@@ -3,13 +3,11 @@
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
   "/api/users/profile": "pages/api/users/profile.js",
-  "/api/groups": "pages/api/groups.js",
-  "/api/notifications": "pages/api/notifications.js",
-  "/api/me/transactions": "pages/api/me/transactions.js",
   "/api/auth/exchange": "pages/api/auth/exchange.js",
-  "/api/wallet/balance": "pages/api/wallet/balance.js",
-  "/api/wallet/pending": "pages/api/wallet/pending.js",
-  "/api/wallet/confirm": "pages/api/wallet/confirm.js",
-  "/api/wallet/payment-sheet": "pages/api/wallet/payment-sheet.js",
-  "/api/me/transactions/find": "pages/api/me/transactions/find.js"
+  "/api/me/transactions": "pages/api/me/transactions.js",
+  "/api/notifications": "pages/api/notifications.js",
+  "/api/groups/[id]/summary": "pages/api/groups/[id]/summary.js",
+  "/api/groups": "pages/api/groups.js",
+  "/api/groups/[id]/activities": "pages/api/groups/[id]/activities.js",
+  "/api/groups/[id]/invites": "pages/api/groups/[id]/invites.js"
 }

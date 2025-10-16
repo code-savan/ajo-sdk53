@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, CheckCircle, AlertCircle, InfoIcon, Calendar } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle, AlertCircle, InfoIcon, Calendar, DollarSign, Users, Wallet2 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { apiGet, apiPut } from '../../lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useToast } from '../../contexts/ToastContext';
+// import { Wallet } from 'lucide-react';
 
 type NotificationsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -15,33 +17,77 @@ export default function NotificationsScreen() {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<any[]>([]);
+  const [hasCache, setHasCache] = useState(false);
 
   const handleGoBack = () => {
     navigation.goBack();
   };
 
-  const getNotificationIcon = (type: string) => {
-    switch(type) {
-      case 'success':
-        return <CheckCircle size={24} color="#04A73E" />;
-      case 'alert':
-        return <AlertCircle size={24} color="#FF6262" />;
-      case 'calendar':
-        return <Calendar size={24} color="#2563eb" />;
-      case 'info':
-      default:
-        return <InfoIcon size={24} color="#2563eb" />;
+  const formatFriendlyDate = (iso: string) => {
+    if (!iso) return '';
+    const dt = new Date(iso);
+    const now = new Date();
+    const isToday = dt.toDateString() === now.toDateString();
+    const y = new Date(now); y.setDate(now.getDate()-1);
+    if (isToday) return dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (dt.toDateString() === y.toDateString()) return 'Yesterday';
+    return dt.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
+
+  const getNotificationIcon = (n: any) => {
+    const type: string = (n?.type || '').toString();
+    const kind: string = (n?.data?.kind || '').toString();
+    // Map DB types/kinds to icons
+    if (type === 'transaction_update' || kind.includes('wallet') || kind.includes('withdrawal')) {
+      return <Wallet2 size={24} color="#2563eb" />;
     }
+    if (type === 'contribution_reminder' || kind.includes('contribution')) {
+      return <Calendar size={24} color="#2563eb" />;
+    }
+    if (type === 'group_invite' || kind.includes('invite')) {
+      return <Users size={24} color="#2563eb" />;
+    }
+    if (type === 'payout_available') {
+      return <CheckCircle size={24} color="#04A73E" />;
+    }
+    if ((n?.data?.ui_type || '').toString() === 'success') {
+      return <CheckCircle size={24} color="#04A73E" />;
+    }
+    if ((n?.data?.ui_type || '').toString() === 'alert') {
+      return <AlertCircle size={24} color="#FF6262" />;
+    }
+    return <InfoIcon size={24} color="#2563eb" />;
   };
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
+      let usedCache = false;
+      try {
+        const cached = await AsyncStorage.getItem('notifications_list_cache_v1');
+        if (cached) {
+          try {
+            const arr = JSON.parse(cached);
+            if (Array.isArray(arr) && arr.length > 0) {
+              setItems(arr);
+              usedCache = true;
+              setHasCache(true);
+              setLoading(false);
+            }
+          } catch {}
+        }
+      } catch {}
+      if (!usedCache) setLoading(true);
       try {
         const res = await apiGet('/api/notifications?page=1&limit=50');
         const list = res?.data || res?.data?.data || res?.data || [];
         const flat = Array.isArray(list) ? list : (Array.isArray(res?.data?.data) ? res.data.data : []);
         setItems(flat);
+        try { await AsyncStorage.setItem('notifications_list_cache_v1', JSON.stringify(flat)); } catch {}
+        // Update unread cache for badges
+        try {
+          const unreadCount = flat.filter((n: any) => !n.read).length;
+          await AsyncStorage.setItem('main_unread_cache_v1', JSON.stringify(unreadCount));
+        } catch {}
       } catch {
         setItems([]);
         showToast({ message: 'Failed to load notifications.', variant: 'error' });
@@ -60,13 +106,31 @@ export default function NotificationsScreen() {
   const markAsRead = async (id: string) => {
     try {
       await apiPut(`/api/notifications/${id}/read`, {});
-      setItems(prev => prev.map(i => i.id === id ? { ...i, read: true } : i));
+      setItems(prev => {
+        const next = prev.map(i => i.id === id ? { ...i, read: true } : i);
+        // Persist to cache and update unread count quickly
+        try {
+          AsyncStorage.setItem('notifications_list_cache_v1', JSON.stringify(next));
+          const unreadCount = next.filter((n: any) => !n.read).length;
+          AsyncStorage.setItem('main_unread_cache_v1', JSON.stringify(unreadCount));
+        } catch {}
+        return next;
+      });
     } catch {}
   };
 
   const handleOpen = async (n: any) => {
     if (!n.read) await markAsRead(n.id);
-    navigation.navigate('NotificationDetail' as never, { notification: { id: n.id, title: n.title, message: n.message, type: n.type, data: n.data, created_at: n.created_at } } as never);
+    navigation.navigate('NotificationDetail', {
+      notification: {
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+        created_at: n.created_at,
+        data: n.data,
+      }
+    } as never);
   };
 
   return (
@@ -80,53 +144,63 @@ export default function NotificationsScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 20 }} />
+        <ScrollView style={styles.scrollView}>
+          <View style={styles.content}>
+          <Text style={styles.subtitle}>Stay up to date with your recent notifications.</Text>
+
+            {[1,2,3,4].map(i => (
+              <View key={i} style={styles.skelItem}>
+                <View style={styles.skelIcon} />
+                <View style={{ flex: 1 }}>
+                  <View style={styles.skelBarLong} />
+                  <View style={styles.skelBarShort} />
+                </View>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
       ) : (
         <ScrollView style={styles.scrollView}>
           <View style={styles.content}>
             <Text style={styles.subtitle}>Stay up to date with your recent notifications.</Text>
 
-            <View style={styles.notificationGroup}>
-              <Text style={styles.groupTitle}>New</Text>
-              {news.length === 0 ? (
-                <Text style={{ color: '#6B7280' }}>No new notifications.</Text>
-              ) : news.map(n => (
-                <TouchableOpacity key={n.id} style={[styles.notificationItem, !n.read && styles.unreadItem]} onPress={() => handleOpen(n)}>
-                  <View style={styles.iconContainer}>
-                    {getNotificationIcon(n.type)}
-                  </View>
-                  <View style={styles.notificationContent}>
-                    <View style={styles.notificationHeader}>
-                      <Text style={styles.notificationTitle}>{n.title}</Text>
-                      <Text style={styles.notificationTime}>{new Date(n.created_at).toLocaleString()}</Text>
+            {news.length > 0 ? (
+              <View style={styles.notificationGroup}>
+                <Text style={styles.groupTitle}>New</Text>
+                {news.map(n => (
+                  <TouchableOpacity key={n.id} style={[styles.notificationItem, styles.softCard]} onPress={() => handleOpen(n)}>
+                    <View style={styles.iconContainer}>{getNotificationIcon(n)}</View>
+                    <View style={styles.notificationContent}>
+                      <View style={styles.notificationHeader}>
+                        <Text style={styles.notificationTitle}>{n.title}</Text>
+                        <Text style={styles.notificationTime}>{formatFriendlyDate(n.created_at)}</Text>
+                      </View>
+                      <Text style={styles.notificationMessage}>{n.message}</Text>
+                      {/* {Array.isArray(n?.data?.via) && n.data.via.length > 0 ? (
+                        <Text style={styles.viaText}>via: {n.data.via.join(', ')}</Text>
+                      ) : null} */}
                     </View>
-                    <Text style={styles.notificationMessage}>{n.message}</Text>
-                    {Array.isArray(n?.data?.via) && n.data.via.length > 0 ? (
-                      <Text style={{ marginTop: 4, fontSize: 10, color: '#6b7280' }}>via: {n.data.via.join(', ')}</Text>
-                    ) : null}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
 
             <View style={styles.notificationGroup}>
               <Text style={styles.groupTitle}>Earlier</Text>
               {earlier.length === 0 ? (
                 <Text style={{ color: '#6B7280' }}>No earlier notifications.</Text>
               ) : earlier.map(n => (
-                <TouchableOpacity key={n.id} style={styles.notificationItem} onPress={() => handleOpen(n)}>
-                  <View style={styles.iconContainer}>
-                    {getNotificationIcon(n.type)}
-                  </View>
+                <TouchableOpacity key={n.id} style={[styles.notificationItem, styles.softCard]} onPress={() => handleOpen(n)}>
+                  <View style={styles.iconContainer}>{getNotificationIcon(n)}</View>
                   <View style={styles.notificationContent}>
                     <View style={styles.notificationHeader}>
                       <Text style={styles.notificationTitle}>{n.title}</Text>
-                      <Text style={styles.notificationTime}>{new Date(n.created_at).toLocaleString()}</Text>
+                      <Text style={styles.notificationTime}>{formatFriendlyDate(n.created_at)}</Text>
                     </View>
                     <Text style={styles.notificationMessage}>{n.message}</Text>
-                    {Array.isArray(n?.data?.via) && n.data.via.length > 0 ? (
-                      <Text style={{ marginTop: 4, fontSize: 10, color: '#6b7280' }}>via: {n.data.via.join(', ')}</Text>
-                    ) : null}
+                    {/* {Array.isArray(n?.data?.via) && n.data.via.length > 0 ? (
+                      <Text style={styles.viaText}>via: {n.data.via.join(', ')}</Text>
+                    ) : null} */}
                   </View>
                 </TouchableOpacity>
               ))}
@@ -188,6 +262,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingVertical: 16,
   },
+  softCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#EEF2F7',
+    marginBottom: 8,
+  },
   unreadItem: {
     backgroundColor: '#F9FAFB',
   },
@@ -223,4 +306,10 @@ const styles = StyleSheet.create({
     color: '#4b5563',
     lineHeight: 20,
   },
+  viaText: { marginTop: 4, fontSize: 10, color: '#6b7280' },
+  // skeletons
+  skelItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  skelIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E5E7EB', marginRight: 16 },
+  skelBarLong: { height: 14, backgroundColor: '#E5E7EB', borderRadius: 6, marginBottom: 8, width: '70%' },
+  skelBarShort: { height: 12, backgroundColor: '#E5E7EB', borderRadius: 6, width: '40%' },
 });

@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   inputSection: {
-    marginBottom: 30,
+    marginBottom: 15,
   },
   inputLabel: {
     fontSize: 12,
@@ -752,7 +752,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   emailInput: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#000000',
   },
   pinSection: {
@@ -785,7 +785,7 @@ const styles = StyleSheet.create({
   },
   pinInput: {
     flex: 1,
-    fontSize: 18,
+    fontSize: 14,
     color: '#000000',
     fontWeight: '500',
   },
@@ -820,14 +820,14 @@ const styles = StyleSheet.create({
   },
   googleButtonText: {
     color: '#333',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'regular',
     textAlign: 'center',
   },
   faceIdSection: {
     flex: 1,
     justifyContent: 'flex-end',
-    paddingBottom: 40,
+    paddingBottom: 50,
   },
   faceIdButton: {
     borderWidth: 1,
@@ -866,7 +866,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'absolute',
-    bottom: 40,
+    bottom: 10,
     left: 0,
     right: 0,
   },

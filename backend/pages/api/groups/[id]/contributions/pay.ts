@@ -21,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { data: group, error: gErr } = await supabase
       .from('groups')
-      .select('id, contribution_amount_cents, currency, current_cycle, status')
+      .select('id, name, contribution_amount_cents, currency, current_cycle, status')
       .eq('id', groupId)
       .single()
 
@@ -78,7 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (contribErr) return res.status(400).json({ success: false, error: contribErr.message })
 
     try {
-      await createNotification((payload as any).userId, { kind: 'group_funded', group_name: (group as any).name || groupId, amount_cents: amount, currency })
+      await createNotification((payload as any).userId, { kind: 'group_funded', group_name: (group as any).name || groupId, amount_cents: amount, currency }, { external_ref: externalRef, source: 'contribution', group_id: groupId })
     } catch {}
 
     return res.status(201).json({ success: true, data: { debited_cents: amount, external_ref: externalRef } })

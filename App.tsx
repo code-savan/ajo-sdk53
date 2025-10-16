@@ -195,7 +195,30 @@ function AppNavigator() {
       console.log('Notification received (fg):', n.request.content);
     });
     const subResponse = Notifications.addNotificationResponseReceivedListener((resp: any) => {
-      console.log('Notification response:', resp.notification.request.content);
+      try {
+        const data = resp?.notification?.request?.content?.data || {};
+        const notification = {
+          id: data?.notification_id,
+          title: data?.title,
+          message: data?.message,
+          type: data?.type,
+          data,
+          created_at: data?.created_at,
+        };
+        if (notification.id) {
+          if (navigationRef.isReady()) {
+            // Build a stack so back button works: MainTabs -> NotificationDetail
+            navigationRef.reset({ index: 1, routes: [
+              { name: 'MainTabs' as any },
+              { name: 'NotificationDetail' as any, params: { notification } as any }
+            ] as any });
+          }
+        } else {
+          console.log('Notification response missing id; ignoring deep link');
+        }
+      } catch (e) {
+        console.warn('Failed to handle notification response', e);
+      }
     });
     return () => {
       subReceived.remove();

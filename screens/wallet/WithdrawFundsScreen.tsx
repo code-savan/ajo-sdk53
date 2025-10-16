@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { apiGet, apiPost } from '../../lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const formatCurrency = (cents: number): string => {
   const dollars = cents / 100;
@@ -29,11 +30,31 @@ export default function WithdrawFundsScreen() {
   useEffect(() => {
     const load = async () => {
       try {
-        setLoading(true);
+        // hydrate from cache first
+        const [balCache, pendCache] = await Promise.all([
+          AsyncStorage.getItem('wallet_balance_cache_v1'),
+          AsyncStorage.getItem('wallet_pending_cache_v1')
+        ]);
+        let usedCache = false;
+        if (balCache && pendCache) {
+          try {
+            const bc = JSON.parse(balCache);
+            const pc = JSON.parse(pendCache);
+            const available = Number(bc || 0) - Number(pc || 0);
+            setAvailableCents(Math.max(0, available));
+            usedCache = true;
+          } catch {}
+        }
+        if (!usedCache) setLoading(true);
+        // fetch fresh
         const balance = await apiGet('/api/wallet/balance').catch(()=>({ balanceCents: 0 }));
         const pending = await apiGet('/api/wallet/pending').catch(()=>({ pending_cents: 0 }));
         const available = Number(balance?.balanceCents || 0) - Number((pending as any)?.pending_cents || 0);
         setAvailableCents(Math.max(0, available));
+        try {
+          await AsyncStorage.setItem('wallet_balance_cache_v1', JSON.stringify(Number(balance?.balanceCents || 0)));
+          await AsyncStorage.setItem('wallet_pending_cache_v1', JSON.stringify(Number((pending as any)?.pending_cents || 0)));
+        } catch {}
       } catch {
         setError('Failed to load balance');
       } finally {

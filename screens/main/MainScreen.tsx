@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Calendar, Users, Plus, ChevronDown, ChevronUp, ChevronRight, DollarSign } from 'lucide-react-native';
+import NotificationBell from '../../components/NotificationBell';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
@@ -127,14 +128,7 @@ export default function MainScreen() {
           ) : (
             <Text style={styles.headerText}>{`Welcome${name?`, ${name}.`:`.`}`}</Text>
           )}
-          <TouchableOpacity onPress={handleNotificationsPress}>
-            <Bell color="#111827" size={24} />
-            {unread > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationText}>{unread > 9 ? '9+' : String(unread)}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <NotificationBell />
         </View>
 
         <View style={styles.card}>
