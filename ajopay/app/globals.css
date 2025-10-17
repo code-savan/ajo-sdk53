@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/* :root {
+  --background: #ffffff;
+  --foreground: #171717;
+} */
+
+@theme inline {
+  /* --color-background: var(--background);
+  --color-foreground: var(--foreground); */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* @media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+} */
+
+html {
+    scroll-behavior: smooth;
+}
+
+/* Typography: Inter for body, Poppins for headings */
+body {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+h1, h2, h3, h4, h5, h6, .heading {
+  font-family: var(--font-poppins), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, Arial;
+}
+/* From Uiverse.io by Yaya12085 */
+.playstore-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #000;
+    border-radius: 15px;
+    background-color:  rgba(255, 255, 255, 1);
+    padding: 0.625rem 1.5rem;
+    text-align: center;
+    color: rgba(0, 0, 0, 1);
+    outline: 0;
+    transition: all  .2s ease;
+    text-decoration: none;
+  }
+
+  .appstore-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #000;
+    border-radius: 15px;
+    background-color: rgba(255, 255, 255, 1);
+    padding: 0.625rem 1.5rem;
+    text-align: center;
+    color: rgba(0, 0, 0, 1);
+    outline: 0;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+
+  /* .playstore-button:hover {
+    background-color: transparent;
+    color: rgba(0, 0, 0, 1);
+  } */
+
+  .icon {
+    height: 1.5rem;
+    width: 1.5rem;
+  }
+
+
+
+  .texts {
+    margin-left: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1;
+  }
+
+  .text-1 {
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .text-2 {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
