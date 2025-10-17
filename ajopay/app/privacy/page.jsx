@@ -53,7 +53,7 @@ export default function PrivacyPage() {
       </main>
 
       <footer className="w-full border-t border-gray-200">
-        <div className="max-w-3xl mx-auto px-6 py-6 text-sm text-gray-500">© {new Date().getFullYear()} Ajo</div>
+        <div className="max-w-3xl mx-auto px-6 py-6 text-sm text-gray-500">© {new Date().getFullYear()} AjoPay</div>
       </footer>
     </div>
   );
