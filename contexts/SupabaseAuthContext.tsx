@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import * as Crypto from 'expo-crypto';
@@ -189,25 +192,21 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
           }
           // Attempt to register for push notifications (best-effort)
           try {
-            // Dynamically import to avoid build issues if not available on web
-            const Notifications = await import('expo-notifications');
-            const Device = await import('expo-device');
-            const Constants = await import('expo-constants');
             if ((Device as any).isDevice) {
-              const { status: existingStatus } = await (Notifications as any).getPermissionsAsync();
+              const { status: existingStatus } = await Notifications.getPermissionsAsync();
               if (__DEV__) console.log('Push permission existingStatus', existingStatus);
               let finalStatus = existingStatus;
               if (existingStatus !== 'granted') {
-                const { status } = await (Notifications as any).requestPermissionsAsync();
+                const { status } = await Notifications.requestPermissionsAsync();
                 if (__DEV__) console.log('Push permission requested ->', status);
                 finalStatus = status;
               }
               if (finalStatus === 'granted') {
                 const projectId = (Constants as any)?.expoConfig?.extra?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
                 if (__DEV__) console.log('Using projectId for token', projectId);
-                const tokenResponse = await (Notifications as any).getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+                const tokenResponse = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
                 if (__DEV__) console.log('Expo push token response', tokenResponse);
-                const expoToken = tokenResponse?.data;
+                const expoToken = (tokenResponse as any)?.data;
                 if (expoToken) {
                   const device_id = (Device as any).osBuildId || (Constants as any)?.deviceId || expoToken;
                   const platform = (Device as any).platform || 'unknown';
@@ -236,22 +235,19 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
           if (__DEV__) console.log('Auth listener (primary): TOKEN_REFRESHED, attempting push registration');
           // Also try to register after token refresh to catch cold-start sessions
           try {
-            const Notifications = await import('expo-notifications');
-            const Device = await import('expo-device');
-            const Constants = await import('expo-constants');
             if ((Device as any).isDevice) {
-              const { status: existingStatus } = await (Notifications as any).getPermissionsAsync();
+              const { status: existingStatus } = await Notifications.getPermissionsAsync();
               if (__DEV__) console.log('Push permission existingStatus (refresh)', existingStatus);
               let finalStatus = existingStatus;
               if (existingStatus !== 'granted') {
-                const { status } = await (Notifications as any).requestPermissionsAsync();
+                const { status } = await Notifications.requestPermissionsAsync();
                 if (__DEV__) console.log('Push permission requested (refresh) ->', status);
                 finalStatus = status;
               }
               if (finalStatus === 'granted') {
                 const projectId = (Constants as any)?.expoConfig?.extra?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
-                const tokenResponse = await (Notifications as any).getExpoPushTokenAsync(projectId ? { projectId } : undefined);
-                const expoToken = tokenResponse?.data;
+                const tokenResponse = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+                const expoToken = (tokenResponse as any)?.data;
                 if (expoToken) {
                   const device_id = (Device as any).osBuildId || (Constants as any)?.deviceId || expoToken;
                   const platform = (Device as any).platform || 'unknown';

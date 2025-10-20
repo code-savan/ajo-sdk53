@@ -138,3 +138,10 @@ CREATE TABLE IF NOT EXISTS group_invites (
 
 CREATE INDEX IF NOT EXISTS idx_group_invites_group ON group_invites(group_id);
 CREATE INDEX IF NOT EXISTS idx_group_invites_status ON group_invites(status);
+
+-- Enhancement: link invite directly to a user when identifiable
+ALTER TABLE IF EXISTS public.group_invites
+ADD COLUMN IF NOT EXISTS invited_user_id TEXT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_group_invites_invited_user_id
+ON public.group_invites(invited_user_id);

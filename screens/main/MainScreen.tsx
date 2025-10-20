@@ -34,14 +34,22 @@ export default function MainScreen() {
           AsyncStorage.getItem('main_unread_cache_v1'),
         ]);
         let anyCache = false;
+        let cachedProfile: any = null;
         if (p) {
-          try { const obj = JSON.parse(p); setName(obj?.full_name || (obj?.email ? obj.email.split('@')[0] : '')); anyCache = true; } catch {}
+          try { cachedProfile = JSON.parse(p); setName(cachedProfile?.full_name || (cachedProfile?.email ? cachedProfile.email.split('@')[0] : '')); anyCache = true; } catch {}
         }
+        // Use user-scoped cache keys to avoid bleeding data across accounts
+        const userIdForCache = cachedProfile?.id ? String(cachedProfile.id) : null;
         let cachedGroups: any[] = [];
-        if (g1) { try { cachedGroups = JSON.parse(g1) || []; } catch {} }
-        if ((!cachedGroups || cachedGroups.length === 0) && g2) { try { cachedGroups = JSON.parse(g2) || []; } catch {} }
+        if (userIdForCache) {
+          const scopedGroups = await AsyncStorage.getItem(`groups_cache_u_${userIdForCache}`).catch(()=>null);
+          if (scopedGroups) { try { cachedGroups = JSON.parse(scopedGroups) || []; } catch {} }
+        }
         if (Array.isArray(cachedGroups) && cachedGroups.length) { setGroups(cachedGroups); anyCache = true; }
-        if (t) { try { const arr = JSON.parse(t) || []; setTxns(Array.isArray(arr) ? arr : []); anyCache = true; } catch {} }
+        if (userIdForCache) {
+          const scopedTxns = await AsyncStorage.getItem(`main_txns_cache_u_${userIdForCache}`).catch(()=>null);
+          if (scopedTxns) { try { const arr = JSON.parse(scopedTxns) || []; setTxns(Array.isArray(arr) ? arr : []); anyCache = true; } catch {} }
+        } else if (t) { try { const arr = JSON.parse(t) || []; setTxns(Array.isArray(arr) ? arr : []); anyCache = true; } catch {} }
         if (u) { try { setUnread(Number(JSON.parse(u)||0)); anyCache = true; } catch { setUnread(Number(u)||0); } }
         setHasCache(anyCache);
 
@@ -60,10 +68,12 @@ export default function MainScreen() {
         await AsyncStorage.setItem('main_unread_cache_v1', JSON.stringify(Number(totalUnread||0))).catch(()=>{});
         const grpArr = Array.isArray(grp) ? grp : [];
         setGroups(grpArr);
-        if (grpArr.length) await AsyncStorage.setItem('groups_cache_v1', JSON.stringify(grpArr)).catch(()=>{});
-        const txnArr = Array.isArray(txn) ? txn.slice(0,3) : [];
-        setTxns(txnArr);
-        await AsyncStorage.setItem('main_txns_cache_v1', JSON.stringify(txnArr)).catch(()=>{});
+        // Save user-scoped caches
+        const pid = profile?.id ? String(profile.id) : null;
+        if (pid && grpArr.length) await AsyncStorage.setItem(`groups_cache_u_${pid}`, JSON.stringify(grpArr)).catch(()=>{});
+        const filtered = Array.isArray(txn) ? (txn.filter((r:any)=> r?.source==='contribution' || r?.source==='rotation_earning')).slice(0,3) : [];
+        setTxns(filtered);
+        if (pid) await AsyncStorage.setItem(`main_txns_cache_u_${pid}`, JSON.stringify(filtered)).catch(()=>{});
       } finally {
         if (!background) setLoading(false);
       }
@@ -138,7 +148,7 @@ export default function MainScreen() {
             ) : (
               <Text style={styles.cardHeaderText}>Credit score health: <Text style={styles.goodText}>Good.</Text></Text>
             )}
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('CreditScore')}>
               {loading && !hasCache ? (
                 <View style={{ height: 12, width: 60, backgroundColor: '#E5E7EB', borderRadius: 6 }} />
               ) : (
@@ -311,9 +321,11 @@ export default function MainScreen() {
             );
           })}
 
-          <TouchableOpacity style={styles.viewAllButton} onPress={handleViewAllActivities}>
-            <Text style={styles.viewAllText}>View all activities</Text>
-          </TouchableOpacity>
+          {txns.length > 0 && (
+            <TouchableOpacity style={styles.viewAllButton} onPress={handleViewAllActivities}>
+              <Text style={styles.viewAllText}>View all activities</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
       <TouchableOpacity style={styles.fab} onPress={handleCreateGroup}>

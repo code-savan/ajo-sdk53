@@ -349,13 +349,13 @@ export default function VerifyEmailScreen() {
               </View>
 
               {/* Debug button - only show in development */}
-              {__DEV__ && (
+              {/* {__DEV__ && (
                 <View style={styles.debugContainer}>
                   <TouchableOpacity onPress={debugSupabaseConfig} style={styles.debugButton}>
                     <Text style={styles.debugButtonText}>Debug Supabase Config</Text>
                   </TouchableOpacity>
                 </View>
-              )}
+              )} */}
             </>
           )}
 

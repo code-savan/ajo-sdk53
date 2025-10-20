@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
+import { Users } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, ChevronRight } from 'lucide-react-native';
 import NotificationBell from '../../components/NotificationBell';
@@ -20,6 +21,10 @@ export default function GroupsScreen() {
   const [pickupCount, setPickupCount] = useState<number>(0);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [unread, setUnread] = useState<number>(0);
+  const [invitesVisible, setInvitesVisible] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [invitesLoading, setInvitesLoading] = useState(false);
+  const [invitesError, setInvitesError] = useState<string | null>(null);
 
   useEffect(() => {
     const CACHE_KEY = 'groups_cache_v1';
@@ -39,10 +44,11 @@ export default function GroupsScreen() {
           }
         }
         if (!fromFocus && groups.length === 0) setLoading(true); else setRefreshing(true);
-        const [groupData, txns, notif] = await Promise.all([
+        const [groupData, txns, notif, invites] = await Promise.all([
           apiGet<any[]>('/api/groups').catch(() => []),
           apiGet<any[]>('/api/me/transactions?limit=500').catch(() => []),
           apiGet('/api/notifications?page=1&limit=1&unread_only=true').catch(()=>({ data: { total: 0 } })),
+          apiGet('/api/me/invites?status=pending').catch(()=>({ data: [] })),
         ]);
         const grp = Array.isArray(groupData) ? groupData : [];
         setGroups(grp);
@@ -55,6 +61,7 @@ export default function GroupsScreen() {
         setPickupCount(pickups);
         const totalUnread = (notif as any)?.data?.total ?? (notif as any)?.total ?? 0;
         setUnread(Number(totalUnread||0));
+        setPendingInvites((invites as any)?.data || []);
       } catch (e: any) {
         setError('Failed to load groups');
       } finally {
@@ -66,6 +73,18 @@ export default function GroupsScreen() {
     load(false);
     return unsubscribe;
   }, [navigation]);
+
+  const openInvites = async () => {
+    setInvitesVisible(true);
+    try {
+      setInvitesLoading(true);
+      setInvitesError(null);
+      const res = await apiGet('/api/me/invites?status=pending');
+      setPendingInvites((res as any)?.data || (Array.isArray(res)?res:[]));
+    } finally {
+      setInvitesLoading(false);
+    }
+  };
 
   const handleCreateGroup = () => {
     navigation.navigate('CreateGroup');
@@ -132,6 +151,15 @@ export default function GroupsScreen() {
             )}
           </View>
 
+          {/* Pending Invites CTA */}
+          <TouchableOpacity style={[styles.createGroupButton, { backgroundColor: '#111827' }]} onPress={openInvites}>
+            <View>
+              <Text style={styles.createGroupTitle}>Pending invites</Text>
+              <Text style={styles.createGroupDescription}>{pendingInvites.length ? `${pendingInvites.length} invite${pendingInvites.length>1?'s':''} waiting` : 'View your group invites'}</Text>
+            </View>
+            <ChevronRight width={24} height={24} color="white" />
+          </TouchableOpacity>
+
           {/* Create Group Button */}
           <TouchableOpacity style={styles.createGroupButton} onPress={handleCreateGroup}>
             <View>
@@ -178,6 +206,56 @@ export default function GroupsScreen() {
           </View>
         </View>
       </ScrollView>
+      {/* Invites Modal */}
+      <Modal visible={invitesVisible} animationType="slide" transparent onRequestClose={()=>setInvitesVisible(false)}>
+        <View style={{ flex:1, justifyContent:'flex-end' }}>
+          <View style={{ position:'absolute', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.35)' }} />
+          <View style={{ minHeight:'50%', maxHeight:'70%', backgroundColor:'#fff', borderTopLeftRadius:16, borderTopRightRadius:16, padding:16 }}>
+            <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <Text style={{ fontSize:16, color:'#1E1E1E', fontWeight:'500' }}>Pending invites</Text>
+              <TouchableOpacity onPress={()=>setInvitesVisible(false)}><Text style={{ color:'#111827' }}>Close</Text></TouchableOpacity>
+            </View>
+            {invitesError ? (
+              <Text style={{ color:'#EF4444', marginBottom:8 }}>{invitesError}</Text>
+            ) : null}
+            {invitesLoading ? (
+              <View style={{ flex:1, alignItems:'center', justifyContent:'center' }}>
+                <Text style={{ color:'#6B7280' }}>Loading…</Text>
+              </View>
+            ) : pendingInvites.length === 0 ? (
+              <View style={{ flex:1, alignItems:'center', justifyContent:'center' }}>
+                <Users color="#9CA3AF" size={40} />
+                <Text style={{ color:'#6B7280', marginTop:10 }}>No invites yet</Text>
+              </View>
+            ) : (
+              <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+                {pendingInvites.map((inv:any)=> (
+                  <View key={inv.invite_code} style={{ paddingVertical:12, borderBottomWidth:1, borderColor:'#F3F4F6', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                    <View>
+                      <Text style={{ color:'#1E1E1E', fontSize:14 }}>{inv.group_name || 'Group'}</Text>
+                      <Text style={{ color:'#9CA3AF', fontSize:12, marginTop:2 }}>{inv.invite_code.slice(0,6)} • Expires {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '-'}</Text>
+                    </View>
+                    <View style={{ flexDirection:'row', gap: 12 }}>
+                      <TouchableOpacity onPress={()=>{ setInvitesVisible(false); navigation.navigate('InviteLanding', { code: inv.invite_code } as any); }} style={{ paddingVertical:8, paddingHorizontal:12, backgroundColor:'#111827', borderRadius:8 }}>
+                        <Text style={{ color:'#fff', fontSize:12 }}>Accept</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={async()=>{
+                        try {
+                          const updated = await fetch('/api/groups/invites/decline', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ invite_code: inv.invite_code }) } as any).then(r=>r.json()).catch(()=>({}))
+                          const res = await apiGet('/api/me/invites?status=pending').catch(()=>({ data: [] }))
+                          setPendingInvites((updated as any)?.data || [])
+                        } catch {}
+                      }} style={{ paddingVertical:8, paddingHorizontal:12, backgroundColor:'#F3F4F6', borderRadius:8 }}>
+                        <Text style={{ color:'#1F2937', fontSize:12 }}>Reject</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
       <BottomNavigation />
     </SafeAreaView>
   );

@@ -52,6 +52,8 @@ import VerifyAccountScreen from './screens/profile/VerifyAccountScreen';
 import NotificationDetailScreen from './screens/notifications/NotificationDetailScreen';
 import InviteLandingScreen from './screens/groups/InviteLandingScreen';
 import LinkAccountScreen from './screens/profile/LinkAccountScreen';
+import CreditScoreScreen from './screens/profile/CreditScoreScreen';
+import SupportTicketScreen from './screens/profile/SupportTicketScreen';
 
 // Import contexts
 import { SupabaseAuthProvider, useAuth } from './contexts/SupabaseAuthContext';
@@ -122,6 +124,8 @@ export type RootStackParamList = {
   VerifyAccount: undefined;
   NotificationDetail: { notification: { id: string; title: string; message: string; type: string; } };
   InviteLanding: { code?: string } | undefined;
+  CreditScore: undefined;
+  SupportTicket: undefined;
 };
 
 export type MainTabParamList = {
@@ -138,13 +142,15 @@ const navigationRef = createNavigationContainerRef<RootStackParamList>();
 // Keep splash screen visible while loading
 SplashScreen.preventAutoHideAsync();
 
-// Show notifications when app is foregrounded
+// Show notifications when app is foregrounded (updated API)
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    // iOS: show a banner and list entry; Android treats these similarly
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
-  }),
+  }) as any,
 });
 
 // Configure deep linking
@@ -373,6 +379,8 @@ function AppNavigator() {
         <Stack.Screen name="TermsConditions" component={TermsConditionsScreen} />
         <Stack.Screen name="ChangePin" component={ChangePinScreen} />
         <Stack.Screen name="TwoFactorAuth" component={TwoFactorAuthScreen} />
+        <Stack.Screen name="CreditScore" component={CreditScoreScreen} />
+        <Stack.Screen name="SupportTicket" component={SupportTicketScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -24,10 +24,12 @@
     "expo-clipboard": "~8.0.7",
     "expo-constants": "~18.0.8",
     "expo-crypto": "~15.0.7",
+    "expo-device": "~8.0.9",
     "expo-image-picker": "^17.0.8",
     "expo-linear-gradient": "~15.0.7",
     "expo-linking": "~8.0.8",
     "expo-local-authentication": "~17.0.7",
+    "expo-notifications": "^0.32.12",
     "expo-secure-store": "~15.0.7",
     "expo-splash-screen": "~31.0.10",
     "expo-status-bar": "~3.0.8",
@@ -43,9 +45,7 @@
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
     "react-native-url-polyfill": "^2.0.0",
-    "react-native-web": "^0.21.0",
-    "expo-notifications": "~0.32.12",
-    "expo-device": "~8.0.9"
+    "react-native-web": "^0.21.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

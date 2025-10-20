@@ -8,7 +8,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -94,8 +93,7 @@ export default function CreateGroupScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
               <ArrowLeft width={24} height={24} color="#000000" />
@@ -106,6 +104,9 @@ export default function CreateGroupScreen() {
           <ScrollView
             style={styles.content}
             contentContainerStyle={styles.contentContainer}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="on-drag"
+            contentInsetAdjustmentBehavior="always"
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.titleSection}>
@@ -283,7 +284,6 @@ export default function CreateGroupScreen() {
             </View>
           </ScrollView>
         </SafeAreaView>
-      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }

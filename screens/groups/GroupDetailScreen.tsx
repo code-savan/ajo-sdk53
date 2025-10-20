@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Calendar, Users, DollarSign, Pen, X, Facebook, Instagram, MessageCircle, Copy, Link2, Clock, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, Calendar, Users, DollarSign, Pen, X, Facebook, Instagram, MessageCircle, Link2, Clock, ChevronRight, Trash2 } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
@@ -13,8 +13,8 @@ type GroupDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, '
 type GroupDetailScreenRouteProp = RouteProp<RootStackParamList, 'GroupDetail'>;
 
 const femaleAvatarUrl = "https://images.unsplash.com/photo-1543085784-0b3c85b4e8ac?q=80&w=987";
-const maleAvatarUrl = "https://images.unsplash.com/photo-1614248793396-944d024ec422?q=80&w=1064";
-const maleAvatar2Url = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=987";
+// const maleAvatarUrl = "https://images.unsplash.com/photo-1614248793396-944d024ec422?q=80&w=1064";
+// const maleAvatar2Url = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=987";
 
 export default function GroupDetailScreen() {
   const navigation = useNavigation<GroupDetailScreenNavigationProp>();
@@ -33,6 +33,9 @@ export default function GroupDetailScreen() {
   const [invitePhone, setInvitePhone] = useState('');
   const [inviting, setInviting] = useState(false);
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [showDeleteInfo, setShowDeleteInfo] = useState(false);
+  const [suggestedUser, setSuggestedUser] = useState<any | null>(null);
+  const [selectedInvitee, setSelectedInvitee] = useState<any | null>(null);
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -43,7 +46,7 @@ export default function GroupDetailScreen() {
   };
 
   const handleViewAllMembers = () => {
-    navigation.navigate('AllMembers');
+    (navigation as any).navigate('AllMembers' as any, { groupId, groupName } as any);
   };
 
   const handleInviteMember = () => {
@@ -147,6 +150,11 @@ export default function GroupDetailScreen() {
   const available = summary?.availableBalanceCents ?? 0;
   const totalContributed = summary?.totalContributedCents ?? available;
   const durationMonths = summary?.duration_months ?? null;
+  const deletionRules = {
+    rule1: 'If group is open, has more than one member, and the wallet is empty → owner can delete immediately.',
+    rule2: 'If group is open, has more than one member, wallet is not empty, and no rotation payout has happened → members can be refunded and the group closed.',
+    rule3: 'Once a rotation payout has happened → contact support to proceed.',
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -315,10 +323,14 @@ export default function GroupDetailScreen() {
           </View>
             <ChevronRight width={18} height={18} color="#4B5563" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.invitePill} onPress={handleInviteMember}>
+          <TouchableOpacity style={[styles.invitePill, Number(summary?.memberCount||0) >= Number(group?.size||0) && { opacity: 0.5 }]} onPress={() => {
+            if (Number(summary?.memberCount||0) >= Number(group?.size||0)) return;
+            handleInviteMember();
+          }}>
             <Text style={styles.invitePillText}>Invite member</Text>
           </TouchableOpacity>
         </View>
+
 
         {/* Invite Member Bottom Sheet */}
         <Modal
@@ -353,9 +365,52 @@ export default function GroupDetailScreen() {
                     autoCapitalize="none"
                     keyboardType="email-address"
                     value={inviteEmail}
-                    onChangeText={setInviteEmail}
+                    onChangeText={async (v)=>{
+                      setInviteEmail(v);
+                      try {
+                        if (v && v.length >= 2) {
+                          const res = await apiGet(`/api/users/lookup?q=${encodeURIComponent(v)}`).catch(()=>null);
+                          const prof = (res && (res.data || res)) || null;
+                          // set preview state variables
+                          setSuggestedUser(prof && prof.id ? prof : null);
+                          setSelectedInvitee(null);
+                        } else {
+                          setSuggestedUser(null);
+                          setSelectedInvitee(null);
+                        }
+                      } catch { setSuggestedUser(null); setSelectedInvitee(null); }
+                    }}
+                    onBlur={async ()=>{
+                      if (!inviteEmail) return;
+                      try {
+                        const profRes = await apiGet(`/api/users/lookup?q=${encodeURIComponent(inviteEmail)}`).catch(()=>null);
+                        const prof = (profRes && (profRes.data || profRes)) || null;
+                        setSuggestedUser(prof && prof.id ? prof : null);
+                      } catch {}
+                    }}
                   />
                 </View>
+                {/* Preview selectable */}
+                {suggestedUser && !selectedInvitee && (
+                  <TouchableOpacity onPress={() => { setSelectedInvitee(suggestedUser); setInviteEmail(suggestedUser.email || inviteEmail); }} style={{ flexDirection:'row', alignItems:'center', gap:10, backgroundColor:'#FFFFFF', borderWidth:1, borderColor:'#E5E7EB', borderRadius:12, padding:10 }}>
+                    <Image source={{ uri: suggestedUser.profile_image_url || femaleAvatarUrl }} style={{ width:36, height:36, borderRadius:18 }} />
+                    <View style={{ flex:1 }}>
+                      <Text style={{ color:'#1E1E1E', fontSize:14 }}>{suggestedUser.full_name || 'User'}</Text>
+                      <Text style={{ color:'#6B7280', fontSize:12 }}>{suggestedUser.email || '-'}</Text>
+                    </View>
+                    <Text style={{ color:'#2563EB', fontSize:12 }}>Select</Text>
+                  </TouchableOpacity>
+                )}
+                {selectedInvitee && (
+                  <View style={{ flexDirection:'row', alignItems:'center', gap:10, backgroundColor:'#F9FAFB', borderWidth:1, borderColor:'#D1FAE5', borderRadius:12, padding:10 }}>
+                    <Image source={{ uri: selectedInvitee.profile_image_url || femaleAvatarUrl }} style={{ width:36, height:36, borderRadius:18 }} />
+                    <View style={{ flex:1 }}>
+                      <Text style={{ color:'#1E1E1E', fontSize:14 }}>{selectedInvitee.full_name || 'User'}</Text>
+                      <Text style={{ color:'#6B7280', fontSize:12 }}>{selectedInvitee.email || inviteEmail}</Text>
+                    </View>
+                    <Text style={{ color:'#10B981', fontSize:12 }}>Selected</Text>
+                  </View>
+                )}
                 <Text style={{ fontSize: 12, color: '#3B3B3B' }}>Phone (optional)</Text>
                 <View style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#EBEBEB', borderRadius: 8 }}>
                   <TextInput
@@ -367,20 +422,23 @@ export default function GroupDetailScreen() {
                   />
                 </View>
                 <TouchableOpacity
-                  style={[styles.inviteSendButton, inviting && { opacity: 0.6 }]}
+                  style={[styles.inviteSendButton, (inviting || (!selectedInvitee && !invitePhone)) && { opacity: 0.6 }]}
                   onPress={async () => {
                     try {
+                      if (!selectedInvitee && !invitePhone) return; // require selection if email route
                       setInviting(true);
                       await apiPost(`/api/groups/${groupId}/invites`, { email: inviteEmail || null, phone: invitePhone || null });
                       const inv = await apiGet(`/api/groups/${groupId}/invites?status=pending`).catch(()=>[]);
                       setPendingInvites(Array.isArray(inv?.data) ? inv.data : (Array.isArray(inv) ? inv : []));
                       setInviteEmail('');
                       setInvitePhone('');
+                      setSuggestedUser(null);
+                      setSelectedInvitee(null);
                     } finally { setInviting(false); }
                   }}
-                  disabled={inviting}
+                  disabled={inviting || (!!inviteEmail && !selectedInvitee && !invitePhone)}
                 >
-                  <Text style={[styles.primaryButtonText, { color: '#fff' }]}>{inviting ? 'Sending...' : 'Send invite'}</Text>
+                  <Text style={styles.primaryButtonText}>{inviting ? 'Sending...' : 'Send invite'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -446,6 +504,30 @@ export default function GroupDetailScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+
+        {/* Deletion rules and action - visible only to owner */}
+        {summary?.group?.creator_user_id === summary?.current_user_id && (
+        <View style={styles.section}>
+          <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center' }}>
+            <Text style={styles.sectionTitle}>Delete group</Text>
+            <TouchableOpacity onPress={()=>setShowDeleteInfo(v=>!v)}>
+              {/* <Info color="#2563eb" size={18} /> */}
+            </TouchableOpacity>
+          </View>
+          {/* {showDeleteInfo && ( */}
+            <View style={styles.infoCard}>
+              <Text style={styles.infoText}>• {deletionRules.rule1}</Text>
+              <Text style={styles.infoText}>• {deletionRules.rule2}</Text>
+              <Text style={styles.infoText}>• {deletionRules.rule3}</Text>
+            </View>
+          {/* )} */}
+          <TouchableOpacity style={[styles.deleteBtn]} onPress={()=> (navigation as any).navigate('SupportHelp' as any)}>
+            <Trash2 color="#fff" size={18} />
+            <Text style={styles.deleteBtnText}>Request deletion</Text>
+          </TouchableOpacity>
+        </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -622,17 +704,49 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 24,
     marginBottom: 32,
+    marginTop: 32,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '500',
     color: '#1C1C1C',
-    marginBottom: 8,
+    marginBottom: 16,
+    // marginTop: 8,
   },
   sectionSubtitle: {
     fontSize: 12,
     color: '#928F8B',
     marginBottom: 20,
+  },
+  infoCard: {
+    // backgroundColor: '#F9FAFB',
+    // borderWidth: 1,
+    // borderColor: '#E5E7EB',
+    borderRadius: 12,
+    // padding: 12,
+    marginBottom: 12,
+  },
+  infoText: {
+    color: '#4B5563',
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  deleteBtn: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 12,
+    borderRadius: 25,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    gap: 8,
+    // alignSelf: 'flex-start',
+  },
+  deleteBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 3,
   },
   descriptionText: {
     fontSize: 14,
@@ -928,13 +1042,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   inviteSendButton: {
-    flex: 1,
     backgroundColor: '#000000',
     borderRadius: 12,
     paddingVertical: 16,
+    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    // height: 32,
+    minHeight: 48,
   },
   primaryButtonText: {
     fontSize: 12,

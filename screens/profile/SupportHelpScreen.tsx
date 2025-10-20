@@ -24,8 +24,7 @@ const SupportHelpScreen: React.FC<SupportHelpScreenProps> = ({ navigation }) => 
   };
 
   const handleContactSupportPress = () => {
-    // Open email client or in-app chat support
-    console.log('Contact Support pressed');
+    navigation.navigate('SupportTicket' as any);
   };
 
   return (

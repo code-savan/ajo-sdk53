@@ -193,7 +193,11 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ navigation }) => {
       }
 
       // Check for Face ID permission warning
-      if (result.warning && result.warning.includes('NSFaceIDUsageDescription')) {
+      if (
+        'warning' in result &&
+        typeof result.warning === 'string' &&
+        result.warning.includes('NSFaceIDUsageDescription')
+      ) {
         Alert.alert(
           'App Update Required',
           'The app needs to be updated to properly support Face ID. Please restart the app or reinstall it from the App Store.',

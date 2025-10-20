@@ -4,34 +4,36 @@
     "slug": "ajo-mobile-app",
     "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/appicon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "scheme": "ajo",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/appicon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.codesavan.ajo",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication and to protect your account."
+        "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication and to protect your account.",
+        "NSCameraUsageDescription": "This app uses the camera to let you take and upload profile or document photos.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library so you can select existing photos."
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/appicon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.codesavan.ajo"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/appicon.png"
     },
     "extra": {
       "eas": {
@@ -40,7 +42,8 @@
     },
     "owner": "codesavan",
     "plugins": [
-      "expo-secure-store",
+        "expo-secure-store",
+        "expo-image-picker",
       [
         "expo-local-authentication",
         {

@@ -1,135 +1,37 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ChevronRight, Users, X, Calendar, DollarSign } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import Modal from 'react-native-modal';
 
 type AllMembersScreenNavigationProp = StackNavigationProp<RootStackParamList, 'AllMembers'>;
+type AllMembersScreenRouteProp = RouteProp<RootStackParamList, 'GroupDetail'>;
 
-// Member data with payment status
-const allMembers = [
-  {
-    id: 1,
-    name: 'Me',
-    image: require('../../assets/images/me.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-  {
-    id: 2,
-    name: 'Marge',
-    image: require('../../assets/images/user1.png'),
-    role: 'Group Admin',
-    hasPaid: true,
-  },
-  {
-    id: 3,
-    name: 'Debbie',
-    image: require('../../assets/images/user2.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-  {
-    id: 4,
-    name: 'Victor',
-    image: require('../../assets/images/user3.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-  {
-    id: 5,
-    name: 'Paul',
-    image: require('../../assets/images/user4.png'),
-    role: 'Member',
-    hasPaid: false,
-  },
-  {
-    id: 6,
-    name: 'Frenkie',
-    image: require('../../assets/images/user5.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-  {
-    id: 7,
-    name: 'Juniper',
-    image: require('../../assets/images/user1.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-  {
-    id: 8,
-    name: 'Victor',
-    image: require('../../assets/images/user2.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-  {
-    id: 9,
-    name: 'Sarah',
-    image: require('../../assets/images/user3.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-  {
-    id: 10,
-    name: 'Louisa',
-    image: require('../../assets/images/user4.png'),
-    role: 'Member',
-    hasPaid: false,
-  },
-  {
-    id: 11,
-    name: 'Jerome',
-    image: require('../../assets/images/user5.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-  {
-    id: 12,
-    name: 'Uma',
-    image: require('../../assets/images/user1.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-  {
-    id: 13,
-    name: 'Kate',
-    image: require('../../assets/images/user2.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-  {
-    id: 14,
-    name: 'Hira',
-    image: require('../../assets/images/user3.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-  {
-    id: 15,
-    name: 'Sam',
-    image: require('../../assets/images/user4.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-  {
-    id: 16,
-    name: 'Norman',
-    image: require('../../assets/images/user5.png'),
-    role: 'Member',
-    hasPaid: true,
-  },
-];
+import { apiGet } from '../../lib/api';
 
 export default function AllMembersScreen() {
   const navigation = useNavigation<AllMembersScreenNavigationProp>();
+  const route = useRoute<AllMembersScreenRouteProp>();
+  const { groupId, groupName } = (route.params as any) || {};
   const [isGroupInfoVisible, setGroupInfoVisible] = useState(false);
   const [isMemberDetailsVisible, setMemberDetailsVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const list = await apiGet(`/api/groups/${groupId}/members`).catch(()=>[]);
+        setMembers(Array.isArray(list) ? list : []);
+      } finally { setLoading(false); }
+    };
+    load();
+  }, [groupId]);
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -144,10 +46,10 @@ export default function AllMembersScreen() {
     setMemberDetailsVisible(true);
   };
 
-  const currentUserMember = allMembers.find(m => m.name === 'Me');
-  const otherMembers = allMembers.filter(m => m.name !== 'Me');
-  const adminCount = allMembers.filter(m => m.role === 'Group Admin').length;
-  const memberCount = allMembers.filter(m => m.role === 'Member').length;
+  const currentUserMember = members.find(m => m.is_me);
+  const otherMembers = members.filter(m => !m.is_me);
+  const adminCount = members.filter(m => m.role === 'owner').length;
+  const memberCount = members.length - adminCount;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -168,7 +70,7 @@ export default function AllMembersScreen() {
           </View>
           <View style={styles.memberCountBadge}>
             <Users size={16} color="#3358FF" />
-            <Text style={styles.memberCountText}>15</Text>
+            <Text style={styles.memberCountText}>{members.length}</Text>
           </View>
         </View>
 
@@ -176,12 +78,12 @@ export default function AllMembersScreen() {
         {currentUserMember && (
           <TouchableOpacity style={styles.memberItem} onPress={() => handleMemberPress(currentUserMember)}>
             <View style={styles.memberLeft}>
-              <Image source={currentUserMember.image} style={styles.memberAvatar} />
+              <Image source={currentUserMember?.profile_image_url ? { uri: currentUserMember.profile_image_url } : require('../../assets/images/me.png')} style={styles.memberAvatar} />
               {/* <View style={[styles.onlineIndicator, { backgroundColor: currentUserMember.hasPaid ? '#34A853' : '#EF4444' }]} /> */}
             </View>
             <View style={styles.memberInfo}>
-              <Text style={styles.memberName}>{currentUserMember.name}</Text>
-              <Text style={styles.memberRole}>{currentUserMember.role}</Text>
+              <Text style={styles.memberName}>{currentUserMember.full_name || 'You'}</Text>
+              <Text style={styles.memberRole}>{currentUserMember.role === 'owner' ? 'Group Admin' : 'Member'}</Text>
             </View>
             <ChevronRight size={20} color="#4D4845" />
           </TouchableOpacity>
@@ -192,15 +94,17 @@ export default function AllMembersScreen() {
 
         {/* Other Members List */}
         <View style={styles.membersContainer}>
-          {otherMembers.map((member) => (
-            <TouchableOpacity key={member.id} style={styles.memberItem} onPress={() => handleMemberPress(member)}>
+          {loading ? (
+            <ActivityIndicator color="#111" />
+          ) : otherMembers.map((member) => (
+            <TouchableOpacity key={member.user_id} style={styles.memberItem} onPress={() => handleMemberPress(member)}>
               <View style={styles.memberLeft}>
-                <Image source={member.image} style={styles.memberAvatar} />
-                <View style={[styles.onlineIndicator, { backgroundColor: member.hasPaid ? '#34A853' : '#FF4346' }]} />
+                <Image source={member?.profile_image_url ? { uri: member.profile_image_url } : require('../../assets/images/user1.png')} style={styles.memberAvatar} />
+                <View style={[styles.onlineIndicator, { backgroundColor: member.has_paid ? '#34A853' : '#FF4346' }]} />
               </View>
               <View style={styles.memberInfo}>
-                <Text style={styles.memberName}>{member.name}</Text>
-                <Text style={styles.memberRole}>{member.role}</Text>
+                <Text style={styles.memberName}>{member.full_name || 'Member'}</Text>
+                <Text style={styles.memberRole}>{member.role === 'owner' ? 'Group Admin' : 'Member'}</Text>
               </View>
               <ChevronRight size={20} color="#4D4845" />
             </TouchableOpacity>
@@ -286,15 +190,19 @@ export default function AllMembersScreen() {
             <View style={styles.memberMetaContainer}>
               <View style={styles.memberMetaItem}>
                 <Calendar size={16} color="#3358FF" />
-                <Text style={styles.memberMetaText}>1/09/2024</Text>
+                <Text style={styles.memberMetaText}>{selectedMember?.joined_at ? new Date(selectedMember.joined_at).toLocaleDateString() : '-'}</Text>
               </View>
               <View style={styles.memberMetaItem}>
                 <Users size={16} color="#3358FF" />
-                <Text style={styles.memberMetaText}>15</Text>
+                <Text style={styles.memberMetaText}>{memberCount + adminCount}</Text>
               </View>
               <View style={styles.memberMetaItem}>
                 <DollarSign size={16} color="#3358FF" />
-                <Text style={styles.memberMetaText}>$100 / mnth</Text>
+                <Text style={styles.memberMetaText}>
+                  {typeof selectedMember?.contribution_amount_cents === 'number'
+                    ? `${(selectedMember.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:String(selectedMember?.currency||'usd').toUpperCase()})} / mnth`
+                    : '-'}
+                </Text>
               </View>
             </View>
 
@@ -302,7 +210,7 @@ export default function AllMembersScreen() {
             <View style={styles.nextPaymentCard}>
               <View>
                 <Text style={styles.nextPaymentLabel}>Next payment is</Text>
-                <Text style={styles.nextPaymentDate}>1/09/2025</Text>
+                <Text style={styles.nextPaymentDate}>{selectedMember?.next_payment_at ? new Date(selectedMember.next_payment_at).toLocaleDateString() : '-'}</Text>
               </View>
               <Calendar size={24} color="#5A5A5A" />
             </View>
@@ -311,21 +219,25 @@ export default function AllMembersScreen() {
             <View style={styles.detailsSection}>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Group name</Text>
-                <Text style={styles.detailValue}>Hawaii Vacation</Text>
+                <Text style={styles.detailValue}>{groupName || 'Group'}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Pickup date</Text>
-                <Text style={styles.detailValue}>1/07/2025</Text>
+                <Text style={styles.detailLabel}>Joined</Text>
+                <Text style={styles.detailValue}>{selectedMember?.joined_at ? new Date(selectedMember.joined_at).toLocaleDateString() : '-'}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Amount contributed</Text>
-                <Text style={styles.detailValue}>$100</Text>
+                <Text style={styles.detailLabel}>Paid this cycle</Text>
+                <Text style={[styles.detailValue, { color: selectedMember?.has_paid ? '#34A853' : '#FF4346' }]}>{selectedMember?.has_paid ? 'Yes' : 'No'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Contribution status</Text>
-                <Text style={[styles.detailValue, { color: selectedMember.hasPaid ? '#34A853' : '#FF4346' }]}>
-                  {selectedMember.hasPaid ? 'Paid' : 'Not Paid'}
+                <Text style={[styles.detailValue, { color: selectedMember?.has_paid ? '#34A853' : '#FF4346' }]}>
+                  {selectedMember?.has_paid ? 'Paid' : 'Not Paid'}
                 </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Amount</Text>
+                <Text style={styles.detailValue}>{typeof selectedMember?.contribution_amount_cents === 'number' ? (selectedMember.contribution_amount_cents/100).toLocaleString('en-US',{style:'currency',currency:String(selectedMember?.currency||'usd').toUpperCase()}) : '-'}</Text>
               </View>
             </View>
           </View>
