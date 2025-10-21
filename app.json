@@ -1,22 +1,23 @@
 {
   "expo": {
-    "name": "Ajo",
+    "name": "Ajo Pay",
     "slug": "ajo-mobile-app",
-    "version": "1.0.1",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/appicon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "scheme": "ajo",
+    "scheme": "ajopay",
     "splash": {
       "image": "./assets/appicon.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
+      "imageSize": [32, 32],
       "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.codesavan.ajo",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication and to protect your account.",
@@ -44,6 +45,7 @@
     "plugins": [
         "expo-secure-store",
         "expo-image-picker",
+        "expo-notifications",
       [
         "expo-local-authentication",
         {
@@ -53,10 +55,10 @@
       "expo-image-picker"
     ],
     "linking": {
-      "scheme": "ajo",
+      "scheme": "ajopay",
       "prefixes": [
-        "ajo://",
-        "https://ajo.app"
+        "ajopay://",
+        "https://ajopayy.app"
       ]
     }
   }
