@@ -192,18 +192,29 @@ export default function VerifyEmailScreen() {
     setErrorMessage('');
 
     try {
-      // Resend OTP using Supabase (for signup, we use signInWithOtp)
-      console.log('Resending OTP to:', contactInfo);
+      console.log('Resending OTP to:', contactInfo, 'Type:', verificationType);
 
-      const { error } = await supabase.auth.signInWithOtp({
-        email: contactInfo.toLowerCase().trim(),
-        options: {
-          shouldCreateUser: false, // Don't create user yet
+      if (verificationType === 'phone') {
+        // Resend OTP via SMS
+        const { error } = await supabase.auth.signInWithOtp({
+          phone: contactInfo,
+        });
+
+        if (error) {
+          throw error;
         }
-      });
+      } else {
+        // Resend OTP via email
+        const { error } = await supabase.auth.signInWithOtp({
+          email: contactInfo.toLowerCase().trim(),
+          options: {
+            shouldCreateUser: false, // Don't create user yet
+          }
+        });
 
-      if (error && !error.message?.includes('User not found')) {
-        throw error;
+        if (error && !error.message?.includes('User not found')) {
+          throw error;
+        }
       }
 
       Alert.alert(
@@ -222,6 +233,8 @@ export default function VerifyEmailScreen() {
         errorMsg += 'Too many requests. Please wait a moment before trying again.';
       } else if (err.message?.includes('Invalid email')) {
         errorMsg += 'The email address appears to be invalid.';
+      } else if (err.message?.includes('Invalid phone')) {
+        errorMsg += 'The phone number appears to be invalid.';
       } else {
         errorMsg += err.message || 'Please check your internet connection and try again.';
       }

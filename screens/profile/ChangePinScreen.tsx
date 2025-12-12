@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Keyboard, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { ChevronLeft, Eye, EyeOff } from 'lucide-react-native';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
 
 // Define navigation prop types
 interface ChangePinScreenProps {
@@ -11,13 +12,15 @@ interface ChangePinScreenProps {
 }
 
 const ChangePinScreen: React.FC<ChangePinScreenProps> = ({ navigation }) => {
+  const { updatePin } = useAuth();
   const [oldPin, setOldPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [repeatNewPin, setRepeatNewPin] = useState('');
   const [showOldPin, setShowOldPin] = useState(false);
   const [showNewPin, setShowNewPin] = useState(false);
   const [showRepeatPin, setShowRepeatPin] = useState(false);
-  
+  const [isLoading, setIsLoading] = useState(false);
+
   // Refs for TextInputs to allow focus management
   const newPinRef = useRef<TextInput>(null);
   const repeatPinRef = useRef<TextInput>(null);
@@ -38,20 +41,83 @@ const ChangePinScreen: React.FC<ChangePinScreenProps> = ({ navigation }) => {
     setShowRepeatPin(!showRepeatPin);
   };
 
-  const handleSavePin = () => {
-    // Here you would implement PIN validation and saving logic
-    // For example, check if new PIN matches repeat PIN, if old PIN is correct, etc.
-    console.log('Saving PIN...');
-    navigation.goBack();
+  const handleSavePin = async () => {
+    // Validate inputs
+    if (!oldPin.trim()) {
+      Alert.alert('Error', 'Please enter your current PIN');
+      return;
+    }
+
+    if (oldPin.length !== 4) {
+      Alert.alert('Error', 'Current PIN must be 4 digits');
+      return;
+    }
+
+    if (!newPin.trim()) {
+      Alert.alert('Error', 'Please enter a new PIN');
+      return;
+    }
+
+    if (newPin.length !== 4) {
+      Alert.alert('Error', 'New PIN must be 4 digits');
+      return;
+    }
+
+    if (!repeatNewPin.trim()) {
+      Alert.alert('Error', 'Please confirm your new PIN');
+      return;
+    }
+
+    if (newPin !== repeatNewPin) {
+      Alert.alert('Error', 'New PIN and confirmation do not match');
+      return;
+    }
+
+    if (oldPin === newPin) {
+      Alert.alert('Error', 'New PIN must be different from your current PIN');
+      return;
+    }
+
+    // Validate PIN is numeric
+    if (!/^\d{4}$/.test(newPin)) {
+      Alert.alert('Error', 'PIN must contain only numbers');
+      return;
+    }
+
+    setIsLoading(true);
+    Keyboard.dismiss();
+
+    try {
+      await updatePin(oldPin, newPin);
+
+      Alert.alert(
+        'Success',
+        'Your PIN has been changed successfully',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    } catch (error: any) {
+      console.error('PIN change error:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to change PIN. Please check your current PIN and try again.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}>
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer} 
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
@@ -76,9 +142,10 @@ const ChangePinScreen: React.FC<ChangePinScreenProps> = ({ navigation }) => {
             placeholderTextColor="#1C1C1C"
             secureTextEntry={!showOldPin}
             keyboardType="numeric"
-            maxLength={6}
+            maxLength={4}
             returnKeyType="next"
             onSubmitEditing={() => newPinRef.current?.focus()}
+            editable={!isLoading}
           />
           <TouchableOpacity onPress={toggleOldPinVisibility} style={styles.eyeIcon}>
             {showOldPin ? <EyeOff color="#B0B0B0" size={20} /> : <Eye color="#B0B0B0" size={20} />}
@@ -97,10 +164,11 @@ const ChangePinScreen: React.FC<ChangePinScreenProps> = ({ navigation }) => {
             placeholderTextColor="#1C1C1C"
             secureTextEntry={!showNewPin}
             keyboardType="numeric"
-            maxLength={6}
+            maxLength={4}
             ref={newPinRef}
             returnKeyType="next"
             onSubmitEditing={() => repeatPinRef.current?.focus()}
+            editable={!isLoading}
           />
           <TouchableOpacity onPress={toggleNewPinVisibility} style={styles.eyeIcon}>
             {showNewPin ? <EyeOff color="#B0B0B0" size={20} /> : <Eye color="#B0B0B0" size={20} />}
@@ -119,13 +187,15 @@ const ChangePinScreen: React.FC<ChangePinScreenProps> = ({ navigation }) => {
             placeholderTextColor="#1C1C1C"
             secureTextEntry={!showRepeatPin}
             keyboardType="numeric"
-            maxLength={6}
+            maxLength={4}
             ref={repeatPinRef}
             returnKeyType="done"
             onSubmitEditing={() => {
-              Keyboard.dismiss();
-              handleSavePin();
+              if (!isLoading) {
+                handleSavePin();
+              }
             }}
+            editable={!isLoading}
           />
           <TouchableOpacity onPress={toggleRepeatPinVisibility} style={styles.eyeIcon}>
             {showRepeatPin ? <EyeOff color="#B0B0B0" size={20} /> : <Eye color="#B0B0B0" size={20} />}
@@ -134,8 +204,16 @@ const ChangePinScreen: React.FC<ChangePinScreenProps> = ({ navigation }) => {
       </View>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSavePin}>
-          <Text style={styles.saveButtonText}>Save Pin</Text>
+        <TouchableOpacity
+          style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
+          onPress={handleSavePin}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.saveButtonText}>Save Pin</Text>
+          )}
         </TouchableOpacity>
       </View>
       </ScrollView>
@@ -206,15 +284,18 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   saveButton: {
-    backgroundColor: '#EAEAEA',
+    backgroundColor: '#000000',
     borderRadius: 28,
     paddingVertical: 16,
     alignItems: 'center',
   },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
   saveButtonText: {
     fontSize: 16,
     fontWeight: '400',
-    color: '#3B3B3B',
+    color: '#FFFFFF',
   },
 });
 

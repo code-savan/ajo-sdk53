@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Session, User, AuthError } from '@supabase/supabase-js';
+import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '../lib/supabase';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
@@ -13,6 +14,9 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiGet } from '../lib/api';
 import { apiPost } from '../lib/api';
+
+// Session timeout in milliseconds (30 seconds for testing, can increase to 60 seconds)
+const SESSION_TIMEOUT_MS = 30 * 1000; // 30 seconds
 
 interface ExtendedUser extends User {
   hasPin?: boolean;
@@ -34,6 +38,7 @@ interface AuthContextType {
   signInWithOTP: (email: string) => Promise<void>;
   verifyOTP: (emailOrPhone: string, token: string, type: 'signup' | 'magiclink' | 'sms') => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
   signInWithPhone: (phone: string) => Promise<void>;
   verifyPhoneOTP: (phone: string, token: string) => Promise<void>;
   signOut: (clearLocalData?: boolean) => Promise<void>;
@@ -60,9 +65,13 @@ interface AuthContextType {
   pinAttemptsRemaining: number;
   isPinBlocked: boolean;
   isInSignupFlow: boolean;
+  requiresReauth: boolean; // True when session timed out and needs re-authentication
 
   // Signup flow control
   setSignupFlowComplete: () => void;
+
+  // Session timeout control
+  clearReauthRequired: () => void;
 
   // Error state
   error: AuthError | null;
@@ -99,6 +108,50 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
   const [pinAttemptsRemaining, setPinAttemptsRemaining] = useState(MAX_PIN_ATTEMPTS);
   const [isPinBlocked, setIsPinBlocked] = useState(false);
   const [isInSignupFlow, setIsInSignupFlow] = useState(false);
+  const [requiresReauth, setRequiresReauth] = useState(false);
+
+  // Session timeout tracking
+  const backgroundTimeRef = useRef<number | null>(null);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+
+  // AppState listener for session timeout
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      // App going to background
+      if (appStateRef.current === 'active' && nextAppState.match(/inactive|background/)) {
+        backgroundTimeRef.current = Date.now();
+        console.log('App went to background at:', new Date().toISOString());
+      }
+
+      // App coming to foreground
+      if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
+        if (backgroundTimeRef.current && session) {
+          const timeInBackground = Date.now() - backgroundTimeRef.current;
+          console.log('App returned to foreground after:', timeInBackground, 'ms');
+
+          // If user was in background longer than timeout, require re-authentication
+          if (timeInBackground >= SESSION_TIMEOUT_MS) {
+            console.log('Session timeout - requiring re-authentication');
+            setRequiresReauth(true);
+          }
+        }
+        backgroundTimeRef.current = null;
+      }
+
+      appStateRef.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [session]);
+
+  // Clear reauth requirement after successful login
+  const clearReauthRequired = () => {
+    setRequiresReauth(false);
+  };
 
   useEffect(() => {
     // Complete any pending auth sessions (iOS)
@@ -194,35 +247,47 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
           try {
             if ((Device as any).isDevice) {
               const { status: existingStatus } = await Notifications.getPermissionsAsync();
-              if (__DEV__) console.log('Push permission existingStatus', existingStatus);
+              console.log('Push permission existingStatus', existingStatus);
               let finalStatus = existingStatus;
               if (existingStatus !== 'granted') {
                 const { status } = await Notifications.requestPermissionsAsync();
-                if (__DEV__) console.log('Push permission requested ->', status);
+                console.log('Push permission requested ->', status);
                 finalStatus = status;
               }
               if (finalStatus === 'granted') {
-                const projectId = (Constants as any)?.expoConfig?.extra?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
-                if (__DEV__) console.log('Using projectId for token', projectId);
-                const tokenResponse = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
-                if (__DEV__) console.log('Expo push token response', tokenResponse);
-                const expoToken = (tokenResponse as any)?.data;
-                if (expoToken) {
-                  const device_id = (Device as any).osBuildId || (Constants as any)?.deviceId || expoToken;
-                  const platform = (Device as any).platform || 'unknown';
-                  if (__DEV__) {
+                // Get project ID from EAS config - critical for production builds
+                const projectId = (Constants as any)?.expoConfig?.extra?.eas?.projectId
+                  || (Constants as any)?.easConfig?.projectId
+                  || '3ff39fca-24d1-4af6-9c0f-970a8d5a6335'; // Fallback to known project ID
+                console.log('Using projectId for push token:', projectId);
+
+                try {
+                  const tokenResponse = await Notifications.getExpoPushTokenAsync({ projectId });
+                  console.log('Expo push token response:', JSON.stringify(tokenResponse));
+                  const expoToken = (tokenResponse as any)?.data;
+                  if (expoToken) {
+                    const device_id = (Device as any).osBuildId || (Constants as any)?.deviceId || expoToken;
+                    const platform = (Device as any).osName?.toLowerCase() || 'ios';
                     console.log('Registering device for push', { projectId, expoToken, platform, device_id });
+                    try {
+                      const resp = await apiPost('/api/notifications/register-device', { expo_push_token: expoToken, platform, device_id });
+                      console.log('Device registration response', resp);
+                    } catch (e) {
+                      console.warn('Device registration API failed', e);
+                    }
+                  } else {
+                    console.warn('No push token received from Expo');
                   }
-                  try {
-                    const resp = await apiPost('/api/notifications/register-device', { expo_push_token: expoToken, platform, device_id });
-                    if (__DEV__) console.log('Device registration response', resp);
-                  } catch (e) {
-                    if (__DEV__) console.warn('Device registration failed', e);
-                  }
+                } catch (tokenError) {
+                  console.error('Failed to get Expo push token:', tokenError);
                 }
+              } else {
+                console.log('Push notification permission not granted');
               }
+            } else {
+              console.log('Not a physical device, skipping push registration');
             }
-          } catch (e) { if (__DEV__) console.warn('Push registration error (SIGNED_IN)', e); }
+          } catch (e) { console.warn('Push registration error (SIGNED_IN)', e); }
         } else if (event === 'INITIAL_SESSION' && !session) {
           // Stale/invalid stored tokens on cold start: clear and stop
           try {
@@ -661,6 +726,80 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
       throw err;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const signInWithApple = async () => {
+    try {
+      setError(null);
+      // Don't set global loading - handled by component level state
+      // setIsLoading(true);
+
+      // Import Apple Authentication dynamically
+      const AppleAuthentication = await import('expo-apple-authentication');
+
+      // Check if Apple Sign In is available
+      const isAvailable = await AppleAuthentication.isAvailableAsync();
+      if (!isAvailable) {
+        throw new Error('Sign in with Apple is not available on this device');
+      }
+
+      // Request Apple credential
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        throw new Error('No identity token received from Apple');
+      }
+
+      // Sign in with Supabase using the Apple ID token
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+
+      if (error) throw error;
+
+      // If we got the user's name from Apple (only provided on first sign-in),
+      // save it to the user's profile
+      if (data?.user && credential.fullName) {
+        const fullName = [credential.fullName.givenName, credential.fullName.familyName]
+          .filter(Boolean)
+          .join(' ');
+
+        if (fullName) {
+          try {
+            await supabase
+              .from('users')
+              .upsert({
+                id: data.user.id,
+                email: data.user.email,
+                full_name: fullName,
+                updated_at: new Date().toISOString(),
+              });
+          } catch (e) {
+            console.warn('Failed to save Apple user name:', e);
+          }
+        }
+      }
+
+      console.log('Apple sign-in successful:', data.user?.id);
+
+    } catch (err: any) {
+      // Handle user cancellation gracefully
+      if (err.code === 'ERR_CANCELED' || err.code === 'ERR_REQUEST_CANCELED') {
+        console.log('Apple sign-in cancelled by user');
+        return;
+      }
+      setError(err as AuthError);
+      throw err;
+    } finally {
+      // Don't set global loading - handled by component level state
+      // setIsLoading(false);
     }
   };
 
@@ -1367,6 +1506,7 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
     signInWithOTP,
     verifyOTP,
     signInWithGoogle,
+    signInWithApple,
     signInWithPhone,
     verifyPhoneOTP,
     signOut,
@@ -1387,7 +1527,9 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
     pinAttemptsRemaining,
     isPinBlocked,
     isInSignupFlow,
+    requiresReauth,
     setSignupFlowComplete,
+    clearReauthRequired,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

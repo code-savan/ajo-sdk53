@@ -45,8 +45,8 @@ export default function RecentActivitiesScreen() {
           setLoading(true);
         }
         // Refresh in background
-        const res = await apiGet(`/api/groups/${groupId}/activities?limit=50`).catch(()=>[]);
-        const arr = Array.isArray(res) ? res : [];
+        const res = await apiGet(`/api/groups/${groupId}/activities?limit=50`).catch(()=>({ data: [] }));
+        const arr = Array.isArray(res?.data) ? res.data : [];
         setActivities(arr);
         await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(arr)).catch(()=>{});
       } finally { setLoading(false); }

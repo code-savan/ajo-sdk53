@@ -36,6 +36,32 @@ export default function GroupDetailScreen() {
   const [showDeleteInfo, setShowDeleteInfo] = useState(false);
   const [suggestedUser, setSuggestedUser] = useState<any | null>(null);
   const [selectedInvitee, setSelectedInvitee] = useState<any | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<string>('14.png');
+  const [updatingProfile, setUpdatingProfile] = useState(false);
+
+  // Available profile images
+  const profileImages = ['1.png', '2.png', '3.png', '4.png', '5.png', '6.png', '7.png', '8.png', '9.png', '10.png', '12.png', '13.png', '14.png'];
+
+  // Map profile image names to require statements
+  const getProfileImageSource = (imageName: string) => {
+    const imageMap: Record<string, any> = {
+      '1.png': require('../../assets/images/groupprofiles/1.png'),
+      '2.png': require('../../assets/images/groupprofiles/2.png'),
+      '3.png': require('../../assets/images/groupprofiles/3.png'),
+      '4.png': require('../../assets/images/groupprofiles/4.png'),
+      '5.png': require('../../assets/images/groupprofiles/5.png'),
+      '6.png': require('../../assets/images/groupprofiles/6.png'),
+      '7.png': require('../../assets/images/groupprofiles/7.png'),
+      '8.png': require('../../assets/images/groupprofiles/8.png'),
+      '9.png': require('../../assets/images/groupprofiles/9.png'),
+      '10.png': require('../../assets/images/groupprofiles/10.png'),
+      '12.png': require('../../assets/images/groupprofiles/12.png'),
+      '13.png': require('../../assets/images/groupprofiles/13.png'),
+      '14.png': require('../../assets/images/groupprofiles/14.png'),
+    };
+    return imageMap[imageName] || imageMap['14.png'];
+  };
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -55,6 +81,23 @@ export default function GroupDetailScreen() {
 
   const handleMakeDeposit = () => {
     (navigation as any).navigate('MakeDeposit' as any, { groupId, groupName } as any);
+  };
+
+  const handleUpdateProfile = async (profileImage: string) => {
+    try {
+      setUpdatingProfile(true);
+      await apiPost(`/api/groups/${groupId}/update-profile`, { profile_image: profileImage });
+      setSelectedProfile(profileImage);
+      setShowProfileModal(false);
+
+      // Refresh summary to get updated data
+      const data = await apiGet(`/api/groups/${groupId}/summary`);
+      setSummary(data);
+    } catch (error: any) {
+      console.error('Failed to update group profile:', error);
+    } finally {
+      setUpdatingProfile(false);
+    }
   };
 
   const handleActivate = async () => {
@@ -106,6 +149,9 @@ export default function GroupDetailScreen() {
         if (!fromFocus && !summary) setLoading(true); else setRefreshing(true);
         const data = await apiGet(`/api/groups/${groupId}/summary`);
         setSummary(data);
+        if (data?.group?.profile_image) {
+          setSelectedProfile(data.group.profile_image);
+        }
         await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data)).catch(()=>{});
         // Load recent activities (top 3) with cache-first and accurate loading state
         const ACT_CACHE = `group_activities_${groupId}`;
@@ -124,8 +170,8 @@ export default function GroupDetailScreen() {
         } catch {}
         setActivitiesLoading(!hadCache);
         try {
-          const acts = await apiGet(`/api/groups/${groupId}/activities?limit=3`).catch(()=>[]);
-          const arr = Array.isArray(acts) ? acts : [];
+          const acts = await apiGet(`/api/groups/${groupId}/activities?limit=3`).catch(()=>({ data: [] }));
+          const arr = Array.isArray(acts?.data) ? acts.data : [];
           setActivities(arr);
           await AsyncStorage.setItem(ACT_CACHE, JSON.stringify(arr)).catch(()=>{});
         } finally { setActivitiesLoading(false); }
@@ -169,9 +215,12 @@ export default function GroupDetailScreen() {
             </View>
             <View style={styles.groupIconContainer}>
               <View style={styles.groupIcon}>
-                <Image source={require('../../assets/images/profile.png')} style={styles.groupIconImage as any} />
+                <Image
+                  source={getProfileImageSource(selectedProfile)}
+                  style={styles.groupIconImage as any}
+                />
               </View>
-              <TouchableOpacity style={styles.editIcon}>
+              <TouchableOpacity style={styles.editIcon} onPress={() => setShowProfileModal(true)}>
                 <Pen size={14} color="#ffffff" />
               </TouchableOpacity>
             </View>
@@ -529,6 +578,65 @@ export default function GroupDetailScreen() {
         </View>
         )}
       </ScrollView>
+
+      {/* Profile Icon Selection Modal */}
+      <Modal
+        isVisible={showProfileModal}
+        onBackdropPress={() => setShowProfileModal(false)}
+        onSwipeComplete={() => setShowProfileModal(false)}
+        swipeDirection="down"
+        style={styles.profileModal}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Profile Icon</Text>
+            <TouchableOpacity onPress={() => setShowProfileModal(false)}>
+              <X size={24} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.currentProfileContainer}>
+            <Image source={getProfileImageSource(selectedProfile)} style={styles.currentProfileImage} />
+          </View>
+
+          <Text style={styles.selectIconLabel}>Select icon</Text>
+
+          <ScrollView
+            contentContainerStyle={styles.profileGrid}
+            showsVerticalScrollIndicator={false}
+          >
+            {profileImages.map((imageName) => (
+              <TouchableOpacity
+                key={imageName}
+                style={[
+                  styles.profileOption,
+                  selectedProfile === imageName && styles.profileOptionSelected
+                ]}
+                onPress={() => setSelectedProfile(imageName)}
+                disabled={updatingProfile}
+              >
+                <Image
+                  source={getProfileImageSource(imageName)}
+                  style={styles.profileOptionImage}
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity
+            style={[styles.saveButton, updatingProfile && styles.saveButtonDisabled]}
+            onPress={() => handleUpdateProfile(selectedProfile)}
+            disabled={updatingProfile}
+          >
+            {updatingProfile ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save changes</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -594,15 +702,15 @@ const styles = StyleSheet.create({
   groupIcon: {
     width: 90,
     height: 90,
-    borderRadius: 16,
-    overflow: 'hidden',
+    borderRadius: 999,
+    overflow: 'visible',
     justifyContent: 'center',
     alignItems: 'center',
   },
   groupIconImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    // borderRadius: 9,
   },
   iconBadge: {
     width: 30,
@@ -1075,5 +1183,91 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '400',
     color: '#1E1E1E',
+  },
+  // Profile Selection Modal Styles
+  profileModal: {
+    justifyContent: 'flex-end',
+    margin: 0,
+  },
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 32,
+    maxHeight: '80%',
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#4D4845',
+  },
+  currentProfileContainer: {
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
+  currentProfileImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 60,
+  },
+  selectIconLabel: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#3B3B3B',
+    marginBottom: 16,
+  },
+  profileGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingBottom: 20,
+  },
+  profileOption: {
+    aspectRatio: 1,
+    marginBottom: 16,
+    borderRadius: '999%',
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: 'transparent',
+    width: 45,
+    height: 45,
+  },
+  profileOptionSelected: {
+    borderColor: '#3358FF',
+  },
+  profileOptionImage: {
+    width: '100%',
+    height: '100%',
+  },
+  saveButton: {
+    backgroundColor: '#000000',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });

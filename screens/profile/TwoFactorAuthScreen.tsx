@@ -12,7 +12,9 @@ import {
   ScrollView,
   Animated,
   Dimensions,
-  Pressable
+  Pressable,
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -20,7 +22,9 @@ import { RootStackParamList } from '../../App';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiGet, apiPut } from '../../lib/api';
 import { useToast } from '../../contexts/ToastContext';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Phone, Shield } from 'lucide-react-native';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { supabase } from '../../lib/supabase';
 
 // Define navigation prop types
 interface TwoFactorAuthScreenProps {
@@ -36,14 +40,22 @@ const securityQuestions = [
 ];
 
 const TwoFactorAuthScreen: React.FC<TwoFactorAuthScreenProps> = ({ navigation }) => {
+  const { user } = useAuth();
   const [tfaEnabled, setTfaEnabled] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [phoneModalVisible, setPhoneModalVisible] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState(securityQuestions[0]);
   const [questionDropdownOpen, setQuestionDropdownOpen] = useState(false);
   const [securityAnswer, setSecurityAnswer] = useState('');
   const [savedQuestion, setSavedQuestion] = useState('');
   const [savedAnswer, setSavedAnswer] = useState('');
   const [saving, setSaving] = useState(false);
+  const [tfaPhone, setTfaPhone] = useState('');
+  const [tfaPhoneVerified, setTfaPhoneVerified] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [sendingCode, setSendingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
   const { showToast } = useToast();
 
   // Get screen dimensions for modal sizing
@@ -51,6 +63,34 @@ const TwoFactorAuthScreen: React.FC<TwoFactorAuthScreenProps> = ({ navigation })
 
   const handleGoBack = () => {
     navigation.goBack();
+  };
+
+  // Format phone number as user types (US format)
+  const formatPhoneNumber = (text: string) => {
+    const cleaned = text.replace(/\D/g, '');
+    const limited = cleaned.slice(0, 10);
+    if (limited.length >= 6) {
+      return `(${limited.slice(0, 3)}) ${limited.slice(3, 6)}-${limited.slice(6)}`;
+    } else if (limited.length >= 3) {
+      return `(${limited.slice(0, 3)}) ${limited.slice(3)}`;
+    } else if (limited.length > 0) {
+      return `(${limited}`;
+    }
+    return '';
+  };
+
+  const handlePhoneChange = (text: string) => {
+    setTfaPhone(formatPhoneNumber(text));
+  };
+
+  const getCleanPhoneNumber = () => {
+    const cleaned = tfaPhone.replace(/\D/g, '');
+    return `+1${cleaned}`;
+  };
+
+  const isValidPhoneNumber = () => {
+    const cleaned = tfaPhone.replace(/\D/g, '');
+    return cleaned.length === 10;
   };
 
   useEffect(() => {
@@ -61,12 +101,20 @@ const TwoFactorAuthScreen: React.FC<TwoFactorAuthScreenProps> = ({ navigation })
           const p = JSON.parse(cached);
           if (typeof p.tfa_enabled === 'boolean') setTfaEnabled(p.tfa_enabled);
           if (p.security_question) setSavedQuestion(p.security_question);
+          if (p.tfa_phone) {
+            setTfaPhone(formatPhoneNumber(p.tfa_phone.replace('+1', '')));
+            setTfaPhoneVerified(true);
+          }
         } catch {}
       }
       const fresh = await apiGet('/api/users/profile').catch(()=>null);
       if (fresh) {
         if (typeof fresh.tfa_enabled === 'boolean') setTfaEnabled(fresh.tfa_enabled);
         if (fresh.security_question) setSavedQuestion(fresh.security_question);
+        if (fresh.tfa_phone) {
+          setTfaPhone(formatPhoneNumber(fresh.tfa_phone.replace('+1', '')));
+          setTfaPhoneVerified(true);
+        }
         await AsyncStorage.setItem('profile_cache_v1', JSON.stringify(fresh)).catch(()=>{});
       }
     };
@@ -84,12 +132,94 @@ const TwoFactorAuthScreen: React.FC<TwoFactorAuthScreenProps> = ({ navigation })
 
   const toggleTfa = async () => {
     const next = !tfaEnabled;
+
+    if (next && !tfaPhoneVerified) {
+      // If enabling 2FA but no phone verified, prompt to add phone first
+      Alert.alert(
+        'Add Phone Number',
+        'To enable Two-Factor Authentication, please add and verify a phone number first.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Add Phone', onPress: () => setPhoneModalVisible(true) }
+        ]
+      );
+      return;
+    }
+
     setTfaEnabled(next);
     if (!next) {
       setSavedQuestion('');
       setSavedAnswer('');
     }
     await persist({ tfa_enabled: next });
+  };
+
+  const sendVerificationCode = async () => {
+    if (!isValidPhoneNumber()) {
+      Alert.alert('Invalid Phone', 'Please enter a valid 10-digit US phone number');
+      return;
+    }
+
+    setSendingCode(true);
+    try {
+      const phone = getCleanPhoneNumber();
+
+      // Send OTP via Supabase
+      const { error } = await supabase.auth.signInWithOtp({
+        phone,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setCodeSent(true);
+      showToast({ message: 'Verification code sent!', variant: 'success' });
+    } catch (error: any) {
+      console.error('Send code error:', error);
+      Alert.alert('Error', error.message || 'Failed to send verification code');
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
+  const verifyPhoneCode = async () => {
+    if (verificationCode.length !== 6) {
+      Alert.alert('Invalid Code', 'Please enter the 6-digit verification code');
+      return;
+    }
+
+    setVerifyingCode(true);
+    try {
+      const phone = getCleanPhoneNumber();
+
+      // Verify OTP - this will link the phone to the user account
+      const { error } = await supabase.auth.verifyOtp({
+        phone,
+        token: verificationCode,
+        type: 'sms',
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Save phone to profile
+      await persist({ tfa_phone: phone, tfa_enabled: true });
+
+      setTfaPhoneVerified(true);
+      setTfaEnabled(true);
+      setPhoneModalVisible(false);
+      setCodeSent(false);
+      setVerificationCode('');
+
+      showToast({ message: 'Phone verified! 2FA is now enabled.', variant: 'success' });
+    } catch (error: any) {
+      console.error('Verify code error:', error);
+      Alert.alert('Error', error.message || 'Invalid verification code');
+    } finally {
+      setVerifyingCode(false);
+    }
   };
 
   const handleSecurityQuestionPress = () => {
@@ -147,11 +277,35 @@ const closeBottomSheet = () => {
         </Text>
       </View>
 
+      {/* Phone Number Setup */}
+      <TouchableOpacity
+        style={styles.securityQuestionContainer}
+        onPress={() => setPhoneModalVisible(true)}
+      >
+        <View style={styles.iconContainer}>
+          <Phone size={20} color="#4D7FFA" />
+        </View>
+        <View style={styles.securityQuestionContent}>
+          <Text style={styles.securityQuestionTitle}>
+            {tfaPhoneVerified ? 'Update phone number' : 'Add phone number'}
+          </Text>
+          <Text style={styles.securityQuestionDescription}>
+            {tfaPhoneVerified
+              ? `Verified: ${tfaPhone}`
+              : 'Add a phone number to receive verification codes via SMS.'}
+          </Text>
+        </View>
+        <ChevronRight color="#4D4845" size={24} />
+      </TouchableOpacity>
+
       <TouchableOpacity
         style={[styles.securityQuestionContainer, !tfaEnabled && styles.disabledContainer]}
         onPress={handleSecurityQuestionPress}
         disabled={!tfaEnabled}
       >
+        <View style={[styles.iconContainer, !tfaEnabled && styles.iconContainerDisabled]}>
+          <Shield size={20} color={tfaEnabled ? "#4D7FFA" : "#C0C0C0"} />
+        </View>
         <View style={styles.securityQuestionContent}>
           <Text style={[styles.securityQuestionTitle, !tfaEnabled && styles.disabledText]}>
             Set a security question
@@ -164,6 +318,114 @@ const closeBottomSheet = () => {
         </View>
         <ChevronRight color={tfaEnabled ? "#4D4845" : "#C0C0C0"} size={24} />
       </TouchableOpacity>
+
+      {/* Phone Number Setup Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={phoneModalVisible}
+        onRequestClose={() => {
+          setPhoneModalVisible(false);
+          setCodeSent(false);
+          setVerificationCode('');
+        }}
+      >
+        <TouchableWithoutFeedback onPress={() => {
+          setPhoneModalVisible(false);
+          setCodeSent(false);
+          setVerificationCode('');
+        }}>
+          <View style={styles.modalContainer}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>
+                    {codeSent ? 'Verify Phone' : 'Add Phone Number'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setPhoneModalVisible(false);
+                      setCodeSent(false);
+                      setVerificationCode('');
+                    }}
+                    style={styles.closeButton}
+                  >
+                    <Text style={styles.closeButtonIcon}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.modalBody}>
+                  {!codeSent ? (
+                    <>
+                      <Text style={styles.inputLabel}>Phone Number (US Only)</Text>
+                      <View style={styles.phoneInputContainer}>
+                        <View style={styles.countryCode}>
+                          <Text style={styles.countryCodeText}>🇺🇸 +1</Text>
+                        </View>
+                        <TextInput
+                          placeholder="(555) 555-5555"
+                          value={tfaPhone}
+                          onChangeText={handlePhoneChange}
+                          keyboardType="phone-pad"
+                          style={styles.phoneInput}
+                          maxLength={14}
+                        />
+                      </View>
+                      <Text style={styles.phoneHint}>
+                        We'll send a verification code to this number.
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.inputLabel}>Verification Code</Text>
+                      <TextInput
+                        placeholder="Enter 6-digit code"
+                        value={verificationCode}
+                        onChangeText={setVerificationCode}
+                        keyboardType="number-pad"
+                        style={styles.textInput}
+                        maxLength={6}
+                        autoFocus
+                      />
+                      <Text style={styles.phoneHint}>
+                        Enter the code sent to {tfaPhone}
+                      </Text>
+                    </>
+                  )}
+                </View>
+
+                <View style={styles.buttonContainer}>
+                  {!codeSent ? (
+                    <TouchableOpacity
+                      style={[styles.saveButton, (!isValidPhoneNumber() || sendingCode) && styles.disabledButton]}
+                      onPress={sendVerificationCode}
+                      disabled={!isValidPhoneNumber() || sendingCode}
+                    >
+                      {sendingCode ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.saveButtonText}>Send Code</Text>
+                      )}
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.saveButton, (verificationCode.length !== 6 || verifyingCode) && styles.disabledButton]}
+                      onPress={verifyPhoneCode}
+                      disabled={verificationCode.length !== 6 || verifyingCode}
+                    >
+                      {verifyingCode ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.saveButtonText}>Verify</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
 
       {/* Security Question Modal */}
       <Modal
@@ -283,11 +545,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F2',
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F0F4FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  iconContainerDisabled: {
+    backgroundColor: '#F5F5F5',
   },
   securityQuestionContent: {
     flex: 1,
     marginRight: 16,
+  },
+  phoneInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#F5F5F5',
+    marginBottom: 8,
+  },
+  countryCode: {
+    paddingHorizontal: 16,
+    borderRightWidth: 1,
+    borderRightColor: '#E0E0E0',
+    height: '100%',
+    justifyContent: 'center',
+  },
+  countryCodeText: {
+    fontSize: 14,
+    color: '#333333',
+    fontWeight: '500',
+  },
+  phoneInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: '#333333',
+  },
+  phoneHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 24,
   },
   securityQuestionTitle: {
     fontSize: 14,

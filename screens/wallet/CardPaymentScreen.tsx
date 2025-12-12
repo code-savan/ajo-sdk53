@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, CreditCard, Lock, Shield, Check } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
@@ -94,32 +94,101 @@ export default function CardPaymentScreen() {
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <ArrowLeft width={24} height={24} color="#000000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Processing payment</Text>
+        <Text style={styles.headerTitle}>Secure Payment</Text>
+        {/* <View style={styles.headerRight} /> */}
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {initializing ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#000" />
-            <Text style={styles.loadingText}>Preparing payment…</Text>
+            <View style={styles.loadingIconContainer}>
+              <ActivityIndicator size="large" color="#3358FF" />
+            </View>
+            <Text style={styles.loadingText}>Preparing secure payment...</Text>
+            <Text style={styles.loadingSubtext}>This will only take a moment</Text>
           </View>
         ) : (
           <>
-            <View style={{ alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 16, color: '#000' }}>Charge amount</Text>
-              <Text style={{ fontSize: 24, fontWeight: '600', color: '#000' }}>{(gross_amount_cents/100).toLocaleString('en-US',{style:'currency',currency})}</Text>
-              {net_amount_cents ? (
-                <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 6 }}>
-                  Includes 3% platform fee. Wallet credit: {(net_amount_cents/100).toLocaleString('en-US',{style:'currency',currency})}
-                </Text>
+            {/* Card Visual */}
+            <View style={styles.cardVisual}>
+              <View style={styles.cardIconContainer}>
+                <CreditCard size={48} color="#3358FF" strokeWidth={1.5} />
+              </View>
+            </View>
+
+            {/* Amount Section */}
+            <View style={styles.amountSection}>
+              <Text style={styles.amountLabel}>Total Amount</Text>
+              <Text style={styles.amountValue}>
+                {(gross_amount_cents/100).toLocaleString('en-US',{style:'currency',currency})}
+              </Text>
+              {net_amount_cents && net_amount_cents !== gross_amount_cents ? (
+                <View style={styles.feeBreakdown}>
+                  <View style={styles.feeRow}>
+                    <Text style={styles.feeLabel}>Wallet credit</Text>
+                    <Text style={styles.feeValue}>
+                      {(net_amount_cents/100).toLocaleString('en-US',{style:'currency',currency})}
+                    </Text>
+                  </View>
+                  <View style={styles.feeRow}>
+                    <Text style={styles.feeLabel}>Processing fee (3%)</Text>
+                    <Text style={styles.feeValue}>
+                      {((gross_amount_cents - net_amount_cents)/100).toLocaleString('en-US',{style:'currency',currency})}
+                    </Text>
+                  </View>
+                </View>
               ) : null}
             </View>
-            <TouchableOpacity style={[styles.payButton, isProcessing && { opacity: 0.6 }]} onPress={onPay} disabled={isProcessing}>
-              <Text style={styles.payButtonText}>{isProcessing ? 'Processing…' : 'Pay now'}</Text>
+
+            {/* Security Features */}
+            {/* <View style={styles.securitySection}>
+              <View style={styles.securityItem}>
+                <View style={styles.securityIconContainer}>
+                  <Lock size={16} color="#10B981" />
+                </View>
+                <Text style={styles.securityText}>256-bit encryption</Text>
+              </View>
+              <View style={styles.securityItem}>
+                <View style={styles.securityIconContainer}>
+                  <Shield size={16} color="#10B981" />
+                </View>
+                <Text style={styles.securityText}>PCI DSS compliant</Text>
+              </View>
+              <View style={styles.securityItem}>
+                <View style={styles.securityIconContainer}>
+                  <Check size={16} color="#10B981" />
+                </View>
+                <Text style={styles.securityText}>Secure payment</Text>
+              </View>
+            </View> */}
+
+            {/* Payment Button */}
+            <TouchableOpacity
+              style={[styles.payButton, isProcessing && styles.payButtonDisabled]}
+              onPress={onPay}
+              disabled={isProcessing}
+            >
+              {isProcessing ? (
+                <>
+                  <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.payButtonText}>Processing...</Text>
+                </>
+              ) : (
+                <>
+                  <Lock size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.payButtonText}>Pay Securely</Text>
+                </>
+              )}
             </TouchableOpacity>
+
+            {/* Powered by Stripe */}
+            <View style={styles.poweredByContainer}>
+              <Text style={styles.poweredByText}>Secured by</Text>
+              <Text style={styles.stripeText}>Stripe</Text>
+            </View>
           </>
         )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -127,39 +196,189 @@ export default function CardPaymentScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F9FAFB',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingVertical: 16,
+    // backgroundColor: '#FFFFFF',
+    // borderBottomWidth: 1,
+    // borderBottomColor: '#F3F4F6',
   },
   backButton: {
-    width: 24,
-    height: 24,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#000000',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingContainer: {
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  headerRight: {
+    width: 40,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
     alignItems: 'center',
   },
-  loadingText: {
-    fontSize: 16,
-    color: '#000000',
-    marginTop: 16,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
   },
-  payButton: { backgroundColor: '#000000', borderRadius: 12, paddingVertical: 16, paddingHorizontal: 24, alignItems: 'center', minWidth: 200 },
-  payButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '500' },
+  loadingIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  loadingText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  loadingSubtext: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  cardVisual: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  cardIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  amountSection: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  amountLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  amountValue: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  feeBreakdown: {
+    width: '100%',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  feeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  feeLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  feeValue: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  securitySection: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginBottom: 32,
+    paddingHorizontal: 8,
+  },
+  securityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  securityIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#D1FAE5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  securityText: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '500',
+  },
+  payButton: {
+    backgroundColor: '#3358FF',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    shadowColor: '#3358FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  payButtonDisabled: {
+    opacity: 0.6,
+  },
+  payButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  poweredByContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  poweredByText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginRight: 4,
+  },
+  stripeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6366F1',
+    letterSpacing: 0.5,
+  },
 });

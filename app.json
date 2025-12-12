@@ -9,26 +9,37 @@
     "newArchEnabled": true,
     "scheme": "ajopay",
     "splash": {
-      "image": "./assets/appicon.png",
-      "resizeMode": "cover",
-      "imageSize": [32, 32],
-      "backgroundColor": "#ffffff"
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#3358FF"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.codesavan.ajo",
-      "buildNumber": "4",
+      "buildNumber": "6",
+      "splash": {
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#3358FF"
+      },
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication and to protect your account.",
         "NSCameraUsageDescription": "This app uses the camera to let you take and upload profile or document photos.",
-        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library so you can select existing photos."
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library so you can select existing photos.",
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/appicon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#3358FF"
+      },
+      "splash": {
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#3358FF"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.codesavan.ajo"
@@ -43,16 +54,24 @@
     },
     "owner": "codesavan",
     "plugins": [
-        "expo-secure-store",
-        "expo-image-picker",
+      "expo-secure-store",
+      "expo-image-picker",
+      "expo-apple-authentication",
+      [
         "expo-notifications",
+        {
+          "icon": "./assets/appicon.png",
+          "color": "#3358FF",
+          "sounds": [],
+          "mode": "production"
+        }
+      ],
       [
         "expo-local-authentication",
         {
           "faceIDPermission": "This app uses Face ID for secure authentication and to protect your account."
         }
-      ],
-      "expo-image-picker"
+      ]
     ],
     "linking": {
       "scheme": "ajopay",

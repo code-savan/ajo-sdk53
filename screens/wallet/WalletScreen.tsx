@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, FlatList } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, FlatList, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -15,10 +15,12 @@ const recentKeyFor = (uid?: string|null) => `wallet_recent_txns_v1:${uid || 'ano
 
 export default function WalletScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const scrollViewRef = useRef<ScrollView>(null);
   const [balanceCents, setBalanceCents] = useState(0);
   const [pendingCents, setPendingCents] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [transactionsLoading, setTransactionsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [unread, setUnread] = useState<number>(0);
 
   useEffect(() => {
@@ -101,10 +103,42 @@ export default function WalletScreen() {
         setTransactionsLoading(false);
       }
     };
-    const unsub = navigation.addListener('focus', load);
+
+    const unsub = navigation.addListener('focus', () => {
+      // Scroll to top when screen comes into focus
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      load();
+    });
     load();
     return unsub;
   }, [navigation]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    const { data } = await supabase.auth.getSession().catch(()=>({ data: { session: null } as any }))
+    const uid = data?.session?.user?.id || null
+    const CACHE_KEY = recentKeyFor(uid)
+
+    try {
+      const [balRes, txnRes, notifRes] = await Promise.all([
+        apiGet('/api/wallet/balance').catch(()=>({ balanceCents: 0, pendingBalanceCents: 0 })),
+        apiGet('/api/me/transactions?limit=100').catch(()=>[]),
+        apiGet('/api/notifications?page=1&limit=1&unread_only=true').catch(()=>({ data: { total: 0 } }))
+      ])
+      setBalanceCents(Number(balRes?.balanceCents || 0))
+      setPendingCents(Number(balRes?.pendingBalanceCents || 0))
+      await AsyncStorage.setItem('wallet_balance_cache_v1', JSON.stringify(balRes?.balanceCents || 0)).catch(()=>{})
+      await AsyncStorage.setItem('wallet_pending_cache_v1', JSON.stringify(balRes?.pendingBalanceCents || 0)).catch(()=>{})
+      const txnArr = Array.isArray(txnRes) ? txnRes : []
+      const filtered = txnArr.filter((t:any) => t.source !== 'fee')
+      setTransactions(filtered)
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(filtered)).catch(()=>{})
+      const totalUnread = (notifRes as any)?.data?.total ?? (notifRes as any)?.total ?? 0
+      setUnread(Number(totalUnread||0))
+    } finally {
+      setRefreshing(false)
+    }
+  };
 
   const handleNotificationsPress = () => {
     navigation.dispatch(CommonActions.navigate('Notifications'));
@@ -165,7 +199,13 @@ export default function WalletScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>My Wallet</Text>

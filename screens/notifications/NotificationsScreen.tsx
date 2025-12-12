@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, CheckCircle, AlertCircle, InfoIcon, Calendar, DollarSign, Users, Wallet2 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -14,8 +14,10 @@ type NotificationsScreenNavigationProp = StackNavigationProp<RootStackParamList>
 
 export default function NotificationsScreen() {
   const navigation = useNavigation<NotificationsScreenNavigationProp>();
+  const scrollViewRef = useRef<ScrollView>(null);
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [hasCache, setHasCache] = useState(false);
 
@@ -95,10 +97,35 @@ export default function NotificationsScreen() {
         setLoading(false);
       }
     };
-    const unsub = navigation.addListener('focus', load);
+
+    const unsub = navigation.addListener('focus', () => {
+      // Scroll to top when screen comes into focus
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      load();
+    });
     load();
     return unsub;
   }, [navigation]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const res = await apiGet('/api/notifications?page=1&limit=50');
+      const list = res?.data || res?.data?.data || res?.data || [];
+      const flat = Array.isArray(list) ? list : (Array.isArray(res?.data?.data) ? res.data.data : []);
+      setItems(flat);
+      try { await AsyncStorage.setItem('notifications_list_cache_v1', JSON.stringify(flat)); } catch {}
+      // Update unread cache for badges
+      try {
+        const unreadCount = flat.filter((n: any) => !n.read).length;
+        await AsyncStorage.setItem('main_unread_cache_v1', JSON.stringify(unreadCount));
+      } catch {}
+    } catch {
+      showToast({ message: 'Failed to refresh notifications.', variant: 'error' });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const news = items.filter(n => !n.read);
   const earlier = items.filter(n => n.read);
@@ -160,7 +187,13 @@ export default function NotificationsScreen() {
           </View>
         </ScrollView>
       ) : (
-        <ScrollView style={styles.scrollView}>
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           <View style={styles.content}>
             <Text style={styles.subtitle}>Stay up to date with your recent notifications.</Text>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { supabase } from '../../lib/supabase';
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { apiGet } from '../../lib/api';
 
 type LoginScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Login'>;
@@ -23,7 +24,10 @@ export default function LoginScreen() {
     user,
     hasPin,
     isLoading: authLoading,
-    signInWithGoogle
+    // signInWithGoogle, // Google auth disabled
+    signInWithApple,
+    requiresReauth,
+    clearReauthRequired
   } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -31,29 +35,83 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  // const [isGoogleLoading, setIsGoogleLoading] = useState(false); // Google auth disabled
+  const [isAppleLoading, setIsAppleLoading] = useState(false);
   const [attemptedBiometric, setAttemptedBiometric] = useState(false);
   const [canGoBack] = useState(navigation.canGoBack());
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [requirePassword, setRequirePassword] = useState(false);
+  const [showPasswordLogin, setShowPasswordLogin] = useState(false); // Toggle for password login option
+  const [localBiometricType, setLocalBiometricType] = useState<string | null>(null);
+  const [hasStoredPassword, setHasStoredPassword] = useState(false);
+  const [storedBiometricEnabled, setStoredBiometricEnabled] = useState(false);
   const passwordInputRef = useRef<TextInput>(null);
+  const loginInProgressRef = useRef(false); // Prevent double-clicks
 
   // Remove eager navigation; let App.tsx handle gating
   useEffect(() => {
     // Intentionally do not navigate here; App.tsx will reset to VerifyAccount or MainTabs
   }, [user, hasPin, navigation]);
 
-  // Check failed attempts on mount
+  // Check failed attempts and biometric availability on mount
   useEffect(() => {
     checkFailedAttempts();
+    checkBiometricAvailability();
+    checkStoredPassword();
   }, []);
 
-  // Auto-attempt biometric authentication if enabled (only once)
-  useEffect(() => {
-    if (biometricEnabled && biometricType && !attemptedBiometric && !user && !requirePassword) {
-      setAttemptedBiometric(true);
-      handleUseFaceID();
+  // Check if biometrics are available on the device
+  const checkBiometricAvailability = async () => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
+
+      if (hasHardware && isEnrolled && supportedTypes.length > 0) {
+        if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+          setLocalBiometricType('face_id');
+        } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+          setLocalBiometricType('fingerprint');
+        } else {
+          setLocalBiometricType('biometric');
+        }
+      }
+    } catch (error) {
+      console.error('Error checking biometric availability:', error);
     }
-  }, [biometricEnabled, biometricType, attemptedBiometric, user, requirePassword]);
+  };
+
+  // Check if there's a stored password and biometric settings for this device
+  const checkStoredPassword = async () => {
+    try {
+      const storedPassword = await SecureStore.getItemAsync('user_password');
+      setHasStoredPassword(!!storedPassword);
+
+      // Also check if biometrics was enabled for this account
+      const biometricEnabledStored = await SecureStore.getItemAsync('biometric_enabled');
+      setStoredBiometricEnabled(biometricEnabledStored === 'true');
+    } catch (error) {
+      console.error('Error checking stored password/biometric:', error);
+      setHasStoredPassword(false);
+      setStoredBiometricEnabled(false);
+    }
+  };
+
+  // Auto-attempt biometric authentication if enabled in user's account (only once)
+  useEffect(() => {
+    const checkAndAttemptBiometric = async () => {
+      // Only auto-attempt if biometric is enabled in user's account settings
+      const storedBiometricEnabled = await SecureStore.getItemAsync('biometric_enabled');
+      const isBiometricEnabled = biometricEnabled || storedBiometricEnabled === 'true';
+
+      if (isBiometricEnabled && (biometricType || localBiometricType) && !attemptedBiometric && !user && !requirePassword) {
+        setAttemptedBiometric(true);
+        handleUseFaceID();
+      }
+    };
+
+    checkAndAttemptBiometric();
+  }, [biometricEnabled, biometricType, localBiometricType, attemptedBiometric, user, requirePassword]);
 
   // Auto-focus password input when it becomes visible
   useEffect(() => {
@@ -158,12 +216,18 @@ export default function LoginScreen() {
   };
 
   const handleProceed = async () => {
+    // Prevent double-clicks
+    if (loginInProgressRef.current || isLoading || authLoading) {
+      console.log('Login already in progress, ignoring');
+      return;
+    }
+
     if (!email.trim()) {
       Alert.alert('Missing Information', 'Please enter your email address');
       return;
     }
 
-    if (requirePassword) {
+    if (requirePassword || showPasswordLogin) {
       if (!password.trim()) {
         Alert.alert('Missing Information', 'Please enter your password');
         return;
@@ -179,6 +243,8 @@ export default function LoginScreen() {
   };
 
   const handlePinLogin = async () => {
+    if (loginInProgressRef.current) return;
+    loginInProgressRef.current = true;
     setIsLoading(true);
     console.log('handlePinLogin: Starting PIN verification for email:', email);
 
@@ -368,10 +434,13 @@ export default function LoginScreen() {
       );
     } finally {
       setIsLoading(false);
+      loginInProgressRef.current = false;
     }
   };
 
   const handlePasswordLogin = async () => {
+    if (loginInProgressRef.current) return;
+    loginInProgressRef.current = true;
     setIsLoading(true);
 
     try {
@@ -379,6 +448,12 @@ export default function LoginScreen() {
       await resetFailedAttempts();
       await SecureStore.setItemAsync('user_email', email);
       await SecureStore.setItemAsync('user_password', password);
+
+      // Clear session timeout flag if set
+      if (requiresReauth) {
+        clearReauthRequired();
+      }
+
       // Proactively fetch profile and navigate if needed for immediate feedback
       try {
         const profile = await apiGet('/api/users/profile');
@@ -398,25 +473,44 @@ export default function LoginScreen() {
       );
     } finally {
       setIsLoading(false);
+      loginInProgressRef.current = false;
     }
   };
 
   const handleUseFaceID = async () => {
-    if (!biometricEnabled) {
+    // Check if biometric is enabled for this user's account
+    const storedBiometricEnabled = await SecureStore.getItemAsync('biometric_enabled');
+    const isBiometricEnabled = biometricEnabled || storedBiometricEnabled === 'true';
+
+    if (!isBiometricEnabled) {
       Alert.alert(
-        'Biometric Login Disabled',
-        'Biometric authentication is not enabled for your account. Please use your PIN to login.'
+        'Biometric Not Enabled',
+        'Biometric authentication is not enabled for your account. Please enable it in Settings > Security to use this feature.'
       );
       return;
     }
 
+    if (!localBiometricType && !biometricType) {
+      Alert.alert(
+        'Biometric Not Available',
+        'Biometric authentication is not available on this device.'
+      );
+      return;
+    }
+
+    if (loginInProgressRef.current) return;
+    loginInProgressRef.current = true;
     setIsLoading(true);
 
     try {
       // First authenticate with biometric
-      const success = await authenticateWithBiometric();
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Login to Ajo Pay',
+        fallbackLabel: 'Use PIN',
+        disableDeviceFallback: false,
+      });
 
-      if (success) {
+      if (result.success) {
         console.log('Biometric authentication successful');
 
         // Get stored email from secure storage
@@ -425,9 +519,10 @@ export default function LoginScreen() {
         if (!storedEmail) {
           Alert.alert(
             'Email Required',
-            'Please enter your email address to sign in.'
+            'Please enter your email address to sign in with biometrics.'
           );
           setIsLoading(false);
+          loginInProgressRef.current = false;
           return;
         }
 
@@ -438,32 +533,63 @@ export default function LoginScreen() {
         await resetFailedAttempts();
 
         // Try to sign in with stored credentials
-        try {
-          const storedPassword = await SecureStore.getItemAsync('user_password');
-          if (storedPassword) {
+        const storedPassword = await SecureStore.getItemAsync('user_password');
+        if (storedPassword) {
+          try {
             await signInWithEmail(storedEmail, storedPassword);
             console.log('Biometric login successful');
+
+            // Clear session timeout flag if set
+            if (requiresReauth) {
+              clearReauthRequired();
+            }
+
+            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] });
+            return;
+          } catch (err: any) {
+            console.log('Password-based biometric login failed:', err.message);
+            // Password might be incorrect, ask user to re-enter
+            Alert.alert(
+              'Session Expired',
+              'Please enter your password to continue.',
+              [
+                { text: 'OK', onPress: () => setShowPasswordLogin(true) }
+              ]
+            );
             return;
           }
-        } catch (err) {
-          console.log('Password-based biometric login failed, checking session');
         }
 
         // Check if there's an existing session
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           console.log('Biometric login successful with existing session');
+
+          // Clear session timeout flag if set
+          if (requiresReauth) {
+            clearReauthRequired();
+          }
+
+          navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] });
           return;
         }
 
-        // Fallback to OTP
-        navigation.navigate('VerifyEmail', {
-          contactInfo: storedEmail,
-          verificationType: 'email'
-        });
+        // No stored password and no session - need password
+        Alert.alert(
+          'Password Required',
+          'Please enter your password to complete login. Your password will be stored securely for future biometric logins.',
+          [
+            { text: 'OK', onPress: () => setShowPasswordLogin(true) }
+          ]
+        );
 
       } else {
-        console.log('Biometric authentication cancelled or failed');
+        console.log('Biometric authentication cancelled or failed:', result.error);
+        if (result.error === 'user_cancel') {
+          // User cancelled, do nothing
+        } else if (result.error) {
+          Alert.alert('Authentication Failed', `Biometric authentication failed: ${result.error}`);
+        }
       }
     } catch (error: any) {
       console.error('Biometric login error:', error);
@@ -473,22 +599,43 @@ export default function LoginScreen() {
       );
     } finally {
       setIsLoading(false);
+      loginInProgressRef.current = false;
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setIsLoading(true);
+  // Google Sign In - COMMENTED OUT
+  // const handleGoogleSignIn = async () => {
+  //   setIsGoogleLoading(true);
+  //   try {
+  //     await signInWithGoogle();
+  //     // Navigation will be handled by auth state change
+  //   } catch (error: any) {
+  //     console.error('Google sign in error:', error);
+  //     Alert.alert(
+  //       'Google Sign In Error',
+  //       error.message || 'Failed to sign in with Google. Please try again.'
+  //     );
+  //   } finally {
+  //     setIsGoogleLoading(false);
+  //   }
+  // };
+
+  const handleAppleSignIn = async () => {
+    setIsAppleLoading(true);
     try {
-      await signInWithGoogle();
+      await signInWithApple();
       // Navigation will be handled by auth state change
     } catch (error: any) {
-      console.error('Google sign in error:', error);
-      Alert.alert(
-        'Google Sign In Error',
-        error.message || 'Failed to sign in with Google. Please try again.'
-      );
+      console.error('Apple sign in error:', error);
+      // Don't show error for user cancellation
+      if (error.code !== 'ERR_CANCELED' && error.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert(
+          'Apple Sign In Error',
+          error.message || 'Failed to sign in with Apple. Please try again.'
+        );
+      }
     } finally {
-      setIsLoading(false);
+      setIsAppleLoading(false);
     }
   };
 
@@ -531,13 +678,20 @@ export default function LoginScreen() {
           </View>
         </View>
 
-        {requirePassword ? (
+        {requirePassword || showPasswordLogin ? (
           /* Password Input Section */
           <View style={styles.pinSection}>
             <Text style={styles.pinLabel}>Password</Text>
-            <Text style={styles.warningText}>
-              PIN locked due to multiple failed attempts. Please use your password.
-            </Text>
+            {requirePassword && (
+              <Text style={styles.warningText}>
+                PIN locked due to multiple failed attempts. Please use your password.
+              </Text>
+            )}
+            {!requirePassword && showPasswordLogin && (
+              <Text style={styles.infoText}>
+                Enter your password to sign in.
+              </Text>
+            )}
             <View style={styles.pinInputContainer}>
               <TextInput
                 ref={passwordInputRef}
@@ -555,8 +709,6 @@ export default function LoginScreen() {
                 textContentType="password"
                 keyboardType="default"
                 selectTextOnFocus={true}
-                onFocus={() => console.log('Password input focused')}
-                onBlur={() => console.log('Password input blurred')}
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
@@ -569,21 +721,14 @@ export default function LoginScreen() {
                 )}
               </TouchableOpacity>
             </View>
-            {__DEV__ && (
-              <View style={{ marginTop: 10 }}>
-                <Text style={{ fontSize: 12, color: '#666' }}>
-                  Debug: Password length: {password.length} | Loading: {isLoading} | AuthLoading: {authLoading}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setPassword('test123');
-                    console.log('Test password set');
-                  }}
-                  style={{ backgroundColor: '#f0f0f0', padding: 8, marginTop: 4, borderRadius: 4 }}
-                >
-                  <Text style={{ fontSize: 12 }}>Set Test Password</Text>
-                </TouchableOpacity>
-              </View>
+            {/* Option to switch back to PIN if not locked */}
+            {!requirePassword && showPasswordLogin && (
+              <TouchableOpacity
+                onPress={() => setShowPasswordLogin(false)}
+                style={styles.switchLoginMethod}
+              >
+                <Text style={styles.switchLoginMethodText}>Use PIN instead</Text>
+              </TouchableOpacity>
             )}
           </View>
         ) : (
@@ -611,6 +756,13 @@ export default function LoginScreen() {
                 selectTextOnFocus={true}
               />
             </View>
+            {/* Option to use password instead (for cross-device login) */}
+            <TouchableOpacity
+              onPress={() => setShowPasswordLogin(true)}
+              style={styles.switchLoginMethod}
+            >
+              <Text style={styles.switchLoginMethodText}>Use password instead</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -618,31 +770,65 @@ export default function LoginScreen() {
         <TouchableOpacity
           style={[styles.proceedButton,
             (isLoading || authLoading || !email.trim() ||
-             (requirePassword && !password.trim()) ||
-             (!requirePassword && pin.length !== 4)
+             ((requirePassword || showPasswordLogin) && !password.trim()) ||
+             (!(requirePassword || showPasswordLogin) && pin.length !== 4)
             ) && styles.proceedButtonDisabled
           ]}
           onPress={handleProceed}
           disabled={isLoading || authLoading || !email.trim() ||
-                   (requirePassword && !password.trim()) ||
-                   (!requirePassword && pin.length !== 4)}
+                   ((requirePassword || showPasswordLogin) && !password.trim()) ||
+                   (!(requirePassword || showPasswordLogin) && pin.length !== 4)}
         >
-          <Text style={styles.proceedButtonText}>
-            {isLoading || authLoading ? 'Signing in...' : 'Proceed'}
+          {isLoading || authLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.proceedButtonText}>Proceed</Text>
+          )}
+        </TouchableOpacity>
+
+        <Text style={styles.orText}>Or sign in with</Text>
+
+        {/* Google Sign In Button - COMMENTED OUT */}
+        {/* <TouchableOpacity
+          style={[styles.googleButton, isGoogleLoading && styles.googleButtonDisabled]}
+          onPress={handleGoogleSignIn}
+          disabled={isGoogleLoading}
+        >
+          {isGoogleLoading ? (
+            <ActivityIndicator size="small" color="#3B3B3B" style={{ marginRight: 12 }} />
+          ) : (
+            <Image
+              source={require('../../assets/images/gmail.png')}
+              style={styles.googleIcon}
+            />
+          )}
+          <Text style={styles.googleButtonText}>
+            {isGoogleLoading ? 'Signing in...' : 'Sign in with Gmail'}
+          </Text>
+        </TouchableOpacity> */}
+
+        {/* Apple Sign In Button */}
+        <TouchableOpacity
+          style={[styles.appleButton, isAppleLoading && styles.appleButtonDisabled]}
+          onPress={handleAppleSignIn}
+          disabled={isAppleLoading}
+        >
+          {isAppleLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 12 }} />
+          ) : (
+            <Image
+              source={require('../../assets/applesignin.png')}
+              style={styles.appleIcon}
+              resizeMode="contain"
+            />
+          )}
+          <Text style={styles.appleButtonText}>
+            {isAppleLoading ? 'Signing in...' : 'Sign in with Apple'}
           </Text>
         </TouchableOpacity>
 
-        {/* Google Sign In Button */}
-        <TouchableOpacity
-          style={[styles.googleButton, (isLoading || authLoading) && styles.googleButtonDisabled]}
-          onPress={handleGoogleSignIn}
-          disabled={isLoading || authLoading}
-        >
-          <Text style={styles.googleButtonText}>Sign in with Google</Text>
-        </TouchableOpacity>
-
-        {/* Face ID Button - Only show if biometric is available and PIN not locked */}
-        {biometricType && !requirePassword && (
+        {/* Face ID Button - Only show if user has enabled biometrics in their account settings */}
+        {(biometricEnabled || storedBiometricEnabled) && (biometricType || localBiometricType) && !requirePassword && !showPasswordLogin && (
           <View style={styles.faceIdSection}>
             <TouchableOpacity
               style={[styles.faceIdButton, (isLoading || authLoading) && styles.faceIdButtonDisabled]}
@@ -650,7 +836,7 @@ export default function LoginScreen() {
               disabled={isLoading || authLoading}
             >
               <Text style={styles.faceIdText}>
-                Use {biometricType === 'face_id' ? 'Face ID' : biometricType === 'fingerprint' ? 'Fingerprint' : 'Biometric'}
+                Use {(biometricType || localBiometricType) === 'face_id' ? 'Face ID' : (biometricType || localBiometricType) === 'fingerprint' ? 'Fingerprint' : 'Biometric'}
               </Text>
               <ScanFace size={20} color={(isLoading || authLoading) ? "#999" : "#000"} />
             </TouchableOpacity>
@@ -769,10 +955,24 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: '500',
   },
+  infoText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+  },
   attemptsText: {
     fontSize: 12,
     color: '#FF8C00',
     marginBottom: 8,
+    fontWeight: '500',
+  },
+  switchLoginMethod: {
+    alignSelf: 'flex-end',
+    marginTop: 12,
+  },
+  switchLoginMethodText: {
+    fontSize: 14,
+    color: '#007AFF',
     fontWeight: '500',
   },
   pinInputContainer: {
@@ -807,22 +1007,58 @@ const styles = StyleSheet.create({
     fontWeight: 'regular',
     textAlign: 'center',
   },
+  orText: {
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#212121',
+    marginBottom: 16,
+  },
   googleButton: {
-    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#d1d5db',
     borderRadius: 12,
-    paddingVertical: 16,
-    marginBottom: 20,
+    backgroundColor: '#ffffff',
+    marginBottom: 12,
   },
   googleButtonDisabled: {
     opacity: 0.6,
   },
+  googleIcon: {
+    width: 20,
+    height: 14,
+    marginRight: 12,
+  },
   googleButtonText: {
-    color: '#333',
-    fontSize: 14,
-    fontWeight: 'regular',
-    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#3B3B3B',
+  },
+  appleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: '#000000',
+    marginBottom: 20,
+  },
+  appleButtonDisabled: {
+    opacity: 0.6,
+  },
+  appleIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+  },
+  appleButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFFFFF',
   },
   faceIdSection: {
     flex: 1,

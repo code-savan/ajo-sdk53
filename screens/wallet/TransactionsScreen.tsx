@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SectionList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SectionList, RefreshControl, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, ChevronUp, X } from 'lucide-react-native';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
@@ -24,7 +24,12 @@ interface TxnItem {
 export default function TransactionsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [transactions, setTransactions] = useState<TxnItem[]>([]);
+  const [showTypeFilter, setShowTypeFilter] = useState(false);
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [showDateFilter, setShowDateFilter] = useState(false);
+  const [selectedDateRange, setSelectedDateRange] = useState<string>('all');
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -42,7 +47,8 @@ export default function TransactionsScreen() {
         if (cached) {
           const parsed = JSON.parse(cached)
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setTransactions(parsed)
+            const filtered = parsed.filter((t: any) => t.source !== 'fee')
+            setTransactions(filtered)
             hadCache = true
           }
         }
@@ -61,8 +67,9 @@ export default function TransactionsScreen() {
         } else {
           merged = transactions
         }
-        setTransactions(merged.filter(t=>t.source !== 'fee'))
-        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(merged)).catch(()=>{})
+        const filtered = merged.filter(t=>t.source !== 'fee')
+        setTransactions(filtered)
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(filtered)).catch(()=>{})
       } finally {
         setLoading(false)
       }
@@ -72,7 +79,61 @@ export default function TransactionsScreen() {
     return unsub;
   }, [navigation]);
 
-  const sections = useMemo(() => groupByMonth(transactions), [transactions]);
+  const filteredTransactions = useMemo(() => {
+    let filtered = transactions;
+
+    // Filter by type
+    if (selectedType !== 'all') {
+      filtered = filtered.filter(t => t.source === selectedType);
+    }
+
+    // Filter by date range
+    if (selectedDateRange !== 'all') {
+      const now = new Date();
+      const startDate = new Date();
+
+      switch (selectedDateRange) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'week':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          startDate.setMonth(now.getMonth() - 1);
+          break;
+        case '3months':
+          startDate.setMonth(now.getMonth() - 3);
+          break;
+      }
+
+      filtered = filtered.filter(t => new Date(t.occurred_at) >= startDate);
+    }
+
+    return filtered;
+  }, [transactions, selectedType, selectedDateRange]);
+
+  const sections = useMemo(() => groupByMonth(filteredTransactions), [filteredTransactions]);
+
+  const handleTransactionPress = (txn: TxnItem) => {
+    navigation.navigate('TransactionDetail', { txn });
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    const { data } = await supabase.auth.getSession().catch(()=>({ data: { session: null } as any }))
+    const uid = data?.session?.user?.id || null
+    const CACHE_KEY = allKeyFor(uid)
+
+    try {
+      const fresh = await apiGet(`/api/me/transactions?limit=200`).catch(()=>([]))
+      const filtered = Array.isArray(fresh) ? fresh.filter((t:any) => t.source !== 'fee') : []
+      setTransactions(filtered)
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(filtered)).catch(()=>{})
+    } finally {
+      setRefreshing(false)
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -85,12 +146,24 @@ export default function TransactionsScreen() {
       </View>
 
       <View style={styles.filtersRow}>
-        <TouchableOpacity style={styles.filterPill}>
-          <Text style={styles.filterText}>All dates</Text>
+        <TouchableOpacity style={styles.filterPill} onPress={() => setShowDateFilter(true)}>
+          <Text style={styles.filterText}>
+            {selectedDateRange === 'all' ? 'All dates' :
+             selectedDateRange === 'today' ? 'Today' :
+             selectedDateRange === 'week' ? 'Last 7 days' :
+             selectedDateRange === 'month' ? 'Last month' :
+             'Last 3 months'}
+          </Text>
           <ChevronDown width={16} height={16} color="#6B7280" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.filterPill}>
-          <Text style={styles.filterText}>All transactions</Text>
+        <TouchableOpacity style={styles.filterPill} onPress={() => setShowTypeFilter(true)}>
+          <Text style={styles.filterText}>
+            {selectedType === 'all' ? 'All transactions' :
+             selectedType === 'deposit' ? 'Deposits' :
+             selectedType === 'withdrawal' ? 'Withdrawals' :
+             selectedType === 'contribution' ? 'Contributions' :
+             'Pickups'}
+          </Text>
           <ChevronDown width={16} height={16} color="#6B7280" />
         </TouchableOpacity>
       </View>
@@ -98,18 +171,119 @@ export default function TransactionsScreen() {
       {loading ? (
         renderSkeleton()
       ) : sections.length === 0 ? (
-        <Text style={{ color: '#6B7280', paddingHorizontal: 20 }}>No transactions yet.</Text>
+        <Text style={{ color: '#6B7280', paddingHorizontal: 20 }}>No transactions found.</Text>
       ) : (
         <SectionList
           sections={sections}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => renderTxnRow(item)}
+          renderItem={({ item }) => renderTxnRow(item, handleTransactionPress)}
           renderSectionHeader={({ section }) => (
             <Text style={styles.sectionHeader}>{section.title}</Text>
           )}
           contentContainerStyle={styles.transactionsContentContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         />
       )}
+
+      {/* Date Filter Modal */}
+      <Modal
+        visible={showDateFilter}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDateFilter(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDateFilter(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filter by Date</Text>
+              <TouchableOpacity onPress={() => setShowDateFilter(false)}>
+                <X size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {['all', 'today', 'week', 'month', '3months'].map((range) => (
+              <TouchableOpacity
+                key={range}
+                style={[
+                  styles.filterOption,
+                  selectedDateRange === range && styles.filterOptionSelected
+                ]}
+                onPress={() => {
+                  setSelectedDateRange(range);
+                  setShowDateFilter(false);
+                }}
+              >
+                <Text style={[
+                  styles.filterOptionText,
+                  selectedDateRange === range && styles.filterOptionTextSelected
+                ]}>
+                  {range === 'all' ? 'All dates' :
+                   range === 'today' ? 'Today' :
+                   range === 'week' ? 'Last 7 days' :
+                   range === 'month' ? 'Last month' :
+                   'Last 3 months'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Type Filter Modal */}
+      <Modal
+        visible={showTypeFilter}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTypeFilter(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowTypeFilter(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filter by Type</Text>
+              <TouchableOpacity onPress={() => setShowTypeFilter(false)}>
+                <X size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {[
+              { value: 'all', label: 'All transactions' },
+              { value: 'deposit', label: 'Deposits' },
+              { value: 'withdrawal', label: 'Withdrawals' },
+              { value: 'contribution', label: 'Contributions' },
+              { value: 'rotation_earning', label: 'Pickups' },
+            ].map((type) => (
+              <TouchableOpacity
+                key={type.value}
+                style={[
+                  styles.filterOption,
+                  selectedType === type.value && styles.filterOptionSelected
+                ]}
+                onPress={() => {
+                  setSelectedType(type.value);
+                  setShowTypeFilter(false);
+                }}
+              >
+                <Text style={[
+                  styles.filterOptionText,
+                  selectedType === type.value && styles.filterOptionTextSelected
+                ]}>
+                  {type.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -156,13 +330,13 @@ function groupByMonth(items: TxnItem[]): { title: string; data: TxnItem[] }[] {
   return Array.from(map.entries()).map(([title, data]) => ({ title, data }));
 }
 
-function renderTxnRow(item: TxnItem) {
+function renderTxnRow(item: TxnItem, onPress: (txn: TxnItem) => void) {
   const { title, subtitle, isPositive } = mapTxnLabels(item);
   const amount = (Number(item.amount_cents)/100).toLocaleString('en-US',{ style: 'currency', currency: (item.currency||'USD').toUpperCase() });
   const dt = new Date(item.occurred_at);
   const rightTime = formatRightTime(dt);
   return (
-    <View style={styles.transaction}>
+    <TouchableOpacity style={styles.transaction} onPress={() => onPress(item)}>
       <View style={styles.transactionIconContainer}>
         {isPositive ? (
           <ChevronUp width={24} height={24} color="#4D4845" />
@@ -174,11 +348,11 @@ function renderTxnRow(item: TxnItem) {
         <Text style={styles.transactionName}>{title}</Text>
         <Text style={styles.transactionType}>{subtitle}</Text>
       </View>
-      <TouchableOpacity style={styles.rightCol} onPress={() => (useNavigation as any).dispatch(CommonActions.navigate('TransactionDetail' as any, { txn: item } as any))}>
+      <View style={styles.rightCol}>
         <Text style={[styles.transactionAmount, isPositive ? styles.positive : styles.negative]}>{amount}</Text>
         <Text style={styles.rightTime}>{rightTime}</Text>
+      </View>
       </TouchableOpacity>
-    </View>
   );
 }
 
@@ -225,4 +399,54 @@ const styles = StyleSheet.create({
   rightTime: { fontSize: 12, color: '#928F8B' },
   positive: { color: '#04A73E' },
   negative: { color: '#FF6262' },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  filterOption: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: '#F9FAFB',
+  },
+  filterOptionSelected: {
+    backgroundColor: '#3358FF',
+  },
+  filterOptionText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  filterOptionTextSelected: {
+    color: '#FFFFFF',
+  },
 });

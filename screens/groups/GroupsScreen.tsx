@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, RefreshControl } from 'react-native';
 import { Users } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, ChevronRight } from 'lucide-react-native';
@@ -8,12 +8,13 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import BottomNavigation from '../../components/BottomNavigation';
-import { apiGet } from '../../lib/api';
+import { apiGet, apiPost } from '../../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GroupCard from '../../components/GroupCard';
 
 export default function GroupsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const scrollViewRef = useRef<ScrollView>(null);
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -26,9 +27,8 @@ export default function GroupsScreen() {
   const [invitesLoading, setInvitesLoading] = useState(false);
   const [invitesError, setInvitesError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const CACHE_KEY = 'groups_cache_v1';
-    const load = async (fromFocus = false) => {
+  const CACHE_KEY = 'groups_cache_v1';
+  const load = async (fromFocus = false) => {
       try {
         if (!fromFocus) {
           const cached = await AsyncStorage.getItem(CACHE_KEY);
@@ -69,7 +69,18 @@ export default function GroupsScreen() {
         setRefreshing(false);
       }
     };
-    const unsubscribe = navigation.addListener('focus', () => load(true));
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load(false);
+  };
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Scroll to top when screen comes into focus
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      load(true);
+    });
     load(false);
     return unsubscribe;
   }, [navigation]);
@@ -110,10 +121,14 @@ export default function GroupsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={true}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         keyboardShouldPersistTaps="handled"
       >
         {/* Header */}
@@ -241,9 +256,9 @@ export default function GroupsScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity onPress={async()=>{
                         try {
-                          const updated = await fetch('/api/groups/invites/decline', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ invite_code: inv.invite_code }) } as any).then(r=>r.json()).catch(()=>({}))
-                          const res = await apiGet('/api/me/invites?status=pending').catch(()=>({ data: [] }))
-                          setPendingInvites((updated as any)?.data || [])
+                          await apiPost('/api/groups/invites/decline', { invite_code: inv.invite_code }).catch(()=>({}));
+                          const res = await apiGet('/api/me/invites?status=pending').catch(()=>({ data: [] }));
+                          setPendingInvites((res as any)?.data || []);
                         } catch {}
                       }} style={{ paddingVertical:8, paddingHorizontal:12, backgroundColor:'#F3F4F6', borderRadius:8 }}>
                         <Text style={{ color:'#1F2937', fontSize:12 }}>Reject</Text>

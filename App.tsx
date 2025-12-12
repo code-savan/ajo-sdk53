@@ -174,20 +174,22 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { display: 'none' }, // Hide tab bar - using custom component
+        tabBarStyle: { display: 'none', height: 0 }, // Hide tab bar - using custom component
+        tabBarShowLabel: false,
+        tabBarButton: () => null, // Prevent any tab bar rendering
       }}
     >
-      <Tab.Screen name="Home" component={MainScreen} />
-      <Tab.Screen name="Groups" component={GroupsScreen} />
-      <Tab.Screen name="Wallet" component={WalletScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Home" component={MainScreen} options={{ tabBarLabel: () => null }} />
+      <Tab.Screen name="Groups" component={GroupsScreen} options={{ tabBarLabel: () => null }} />
+      <Tab.Screen name="Wallet" component={WalletScreen} options={{ tabBarLabel: () => null }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: () => null }} />
     </Tab.Navigator>
   );
 }
 
 // Navigation component with authentication logic
 function AppNavigator() {
-  const { session, isLoading, isInSignupFlow } = useAuth();
+  const { session, isLoading, isInSignupFlow, requiresReauth, clearReauthRequired } = useAuth();
   const [appIsReady, setAppIsReady] = useState(false);
   const [hasPin, setHasPin] = useState<boolean | null>(null);
   const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Splash');
@@ -312,6 +314,19 @@ function AppNavigator() {
       navigationRef.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     }
   }, [mustVerify]);
+
+  // Handle session timeout - redirect to Login when re-authentication is required
+  useEffect(() => {
+    if (!navigationRef.isReady()) return;
+    if (requiresReauth && session) {
+      const current = navigationRef.getCurrentRoute()?.name as keyof RootStackParamList | undefined;
+      // Don't redirect if already on auth screens
+      if (current !== 'Login' && current !== 'Welcome' && current !== 'Splash') {
+        console.log('Session timeout - redirecting to Login');
+        navigationRef.reset({ index: 0, routes: [{ name: 'Login' }] });
+      }
+    }
+  }, [requiresReauth, session]);
 
   // Determine initial route (fallback, not strictly needed after pendingRoute)
   const determineInitialRoute = (): keyof RootStackParamList => {

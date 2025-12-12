@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Calendar, Users, Plus, ChevronDown, ChevronUp, ChevronRight, DollarSign } from 'lucide-react-native';
 import NotificationBell from '../../components/NotificationBell';
@@ -14,17 +14,24 @@ const avatarImageUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf37
 
 export default function MainScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const scrollViewRef = useRef<ScrollView>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [name, setName] = useState<string>('');
   const [unread, setUnread] = useState<number>(0);
   const [groups, setGroups] = useState<any[]>([]);
   const [txns, setTxns] = useState<any[]>([]);
   const [hasCache, setHasCache] = useState(false);
 
-  useEffect(() => {
-    const load = async (background = false) => {
-      if (!background) setLoading(true);
-      try {
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load(false);
+    setRefreshing(false);
+  };
+
+  const load = async (background = false) => {
+    if (!background && !refreshing) setLoading(true);
+    try {
         // hydrate from cache to avoid flicker
         const [p, g1, g2, t, u] = await Promise.all([
           AsyncStorage.getItem('profile_cache_v1'),
@@ -75,10 +82,16 @@ export default function MainScreen() {
         setTxns(filtered);
         if (pid) await AsyncStorage.setItem(`main_txns_cache_u_${pid}`, JSON.stringify(filtered)).catch(()=>{});
       } finally {
-        if (!background) setLoading(false);
+        if (!background && !refreshing) setLoading(false);
       }
     };
-    const unsub = navigation.addListener('focus', () => load(true));
+
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => {
+      // Scroll to top when screen comes into focus
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      load(true);
+    });
     load(false);
     return unsub;
   }, [navigation]);
@@ -131,7 +144,13 @@ export default function MainScreen() {
   };
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         <View style={styles.header}>
           {loading && !hasCache && !name ? (
             <View style={styles.skelHeaderBar} />
@@ -146,8 +165,9 @@ export default function MainScreen() {
             {loading && !hasCache ? (
               <View style={{ height: 12, width: 180, backgroundColor: '#E5E7EB', borderRadius: 6 }} />
             ) : (
-              <Text style={styles.cardHeaderText}>Credit score health: <Text style={styles.goodText}>Good.</Text></Text>
+              <Text style={styles.cardHeaderText}>Your savings overview</Text>
             )}
+            {/* Credit Score temporarily disabled
             <TouchableOpacity onPress={() => navigation.navigate('CreditScore')}>
               {loading && !hasCache ? (
                 <View style={{ height: 12, width: 60, backgroundColor: '#E5E7EB', borderRadius: 6 }} />
@@ -155,6 +175,7 @@ export default function MainScreen() {
                 <Text style={styles.viewInfoText}>View info</Text>
               )}
             </TouchableOpacity>
+            */}
           </View>
           <View style={styles.cardInfo}>
           {loading && !hasCache ? (
