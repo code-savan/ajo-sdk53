@@ -239,6 +239,27 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
         // Handle session events
         if (event === 'SIGNED_IN') {
           if (__DEV__) console.log('Auth listener (primary): SIGNED_IN, attempting push registration');
+
+          // CRITICAL: Clear ALL cached data on sign-in to prevent data leakage
+          // This ensures new users don't see previous user's data
+          try {
+            const cacheKeys = [
+              'profile_cache_v1',
+              'groups_cache_v1',
+              'groups_list_cache_v1',
+              'main_txns_cache_v1',
+              'main_unread_cache_v1',
+              'wallet_balance_cache_v1',
+              'wallet_pending_cache_v1',
+              'notifications_cache_v1',
+              'transactions_cache_v1',
+            ];
+            await AsyncStorage.multiRemove(cacheKeys).catch(() => {});
+            console.log('Cleared old cached data on sign-in');
+          } catch (err) {
+            console.error('Error clearing cache on sign-in:', err);
+          }
+
           // Store session token in SecureStore for extra security if needed
           if (session?.access_token) {
             await SecureStore.setItemAsync('supabase_access_token', session.access_token);
@@ -373,6 +394,23 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (event === 'SIGNED_IN') {
           console.log('User signed in');
+
+          // CRITICAL: Clear ALL cached data on sign-in
+          try {
+            const cacheKeys = [
+              'profile_cache_v1',
+              'groups_cache_v1',
+              'groups_list_cache_v1',
+              'main_txns_cache_v1',
+              'main_unread_cache_v1',
+              'wallet_balance_cache_v1',
+              'wallet_pending_cache_v1',
+              'notifications_cache_v1',
+              'transactions_cache_v1',
+            ];
+            await AsyncStorage.multiRemove(cacheKeys).catch(() => {});
+          } catch {}
+
           // Check if user has PIN
           if (session?.user?.id) {
             await loadUserPinState(session.user.id);
@@ -817,13 +855,52 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
       // Clear session token
       await SecureStore.deleteItemAsync('supabase_access_token');
 
-      // Clear backend JWTs so next user doesn’t reuse
+      // Clear backend JWTs so next user doesn't reuse
       await AsyncStorage.multiRemove(['backend_jwt','backend_jwt_expires_at']).catch(()=>{});
 
-      // Clear user-scoped caches
-      if (currentUserId) {
-        await AsyncStorage.removeItem(`wallet_recent_txns_v1:${currentUserId}`).catch(()=>{});
-        await AsyncStorage.removeItem(`wallet_all_txns_v1:${currentUserId}`).catch(()=>{});
+      // Clear ALL cached data to prevent data leakage between accounts
+      // This is critical for security - new users should never see old user's data
+      const cacheKeys = [
+        // User-scoped caches
+        `wallet_recent_txns_v1:${currentUserId}`,
+        `wallet_all_txns_v1:${currentUserId}`,
+        `groups_cache_u_${currentUserId}`,
+        `main_txns_cache_u_${currentUserId}`,
+        `group_summary_${currentUserId}`,
+        `group_activities_${currentUserId}`,
+        // Global caches (these MUST be cleared on logout)
+        'profile_cache_v1',
+        'groups_cache_v1',
+        'groups_list_cache_v1',
+        'main_txns_cache_v1',
+        'main_unread_cache_v1',
+        'wallet_balance_cache_v1',
+        'wallet_pending_cache_v1',
+        'notifications_cache_v1',
+        'transactions_cache_v1',
+        'user_profile_cache',
+        'wallet_cache',
+        'groups_summary_cache',
+      ];
+
+      // Clear all cache keys
+      await AsyncStorage.multiRemove(cacheKeys).catch((err) => {
+        console.error('Error clearing caches on logout:', err);
+      });
+
+      // Clear group-specific caches (pattern: group_summary_*, group_activities_*)
+      try {
+        const allKeys = await AsyncStorage.getAllKeys();
+        const groupCacheKeys = allKeys.filter(key =>
+          key.startsWith('group_summary_') ||
+          key.startsWith('group_activities_') ||
+          key.includes('_cache_')
+        );
+        if (groupCacheKeys.length > 0) {
+          await AsyncStorage.multiRemove(groupCacheKeys).catch(() => {});
+        }
+      } catch (err) {
+        console.error('Error clearing pattern caches:', err);
       }
 
       // Clear all auth state
@@ -844,7 +921,7 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
         await SecureStore.deleteItemAsync(STORAGE_KEYS.PIN_BLOCKED_UNTIL);
       }
 
-      console.log('Sign out successful');
+      console.log('Sign out successful - all caches cleared');
 
     } catch (err) {
       setError(err as AuthError);
