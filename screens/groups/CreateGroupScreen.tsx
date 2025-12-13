@@ -121,44 +121,41 @@ export default function CreateGroupScreen() {
             {/* Group Name */}
             <View style={styles.inputSection}>
               <Text style={styles.inputLabel}>Group name</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter group name"
-                  value={groupName}
-                  onChangeText={setGroupName}
-                />
-              </View>
+              <TextInput
+                style={[styles.inputContainer, styles.input]}
+                placeholder="Enter group name"
+                value={groupName}
+                onChangeText={setGroupName}
+                placeholderTextColor="#999"
+              />
             </View>
 
             {/* Group Description */}
             <View style={styles.inputSection}>
               <Text style={styles.inputLabel}>Group description</Text>
-              <View style={[styles.inputContainer, styles.textAreaContainer]}>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Description"
-                  value={groupDescription}
-                  onChangeText={setGroupDescription}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
-              </View>
+              <TextInput
+                style={[styles.inputContainer, styles.textAreaContainer, styles.input, styles.textArea]}
+                placeholder="Description"
+                value={groupDescription}
+                onChangeText={setGroupDescription}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                placeholderTextColor="#999"
+              />
             </View>
 
             {/* Group Size */}
             <View style={styles.inputSection}>
               <Text style={styles.inputLabel}>Group size</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter group size"
-                  value={groupSize}
-                  onChangeText={setGroupSize}
-                  keyboardType="number-pad"
-                />
-              </View>
+              <TextInput
+                style={[styles.inputContainer, styles.input]}
+                placeholder="Enter group size"
+                value={groupSize}
+                onChangeText={setGroupSize}
+                keyboardType="number-pad"
+                placeholderTextColor="#999"
+              />
               <Text style={styles.hintText}>Min ~ 3 | Max ~ 30</Text>
             </View>
 
@@ -173,29 +170,27 @@ export default function CreateGroupScreen() {
             {/* Goal Amount (auto-calculated) */}
             <View style={styles.inputSection}>
               <Text style={styles.inputLabel}>Goal amount</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter goal amount"
-                  value={goalAmount}
-                  editable={false}
-                  selectTextOnFocus={false}
-                />
-              </View>
+              <TextInput
+                style={[styles.inputContainer, styles.input, styles.disabledInput]}
+                placeholder="Enter goal amount"
+                value={goalAmount}
+                editable={false}
+                selectTextOnFocus={false}
+                placeholderTextColor="#999"
+              />
             </View>
 
             {/* Contribution Amount */}
             <View style={styles.inputSection}>
               <Text style={styles.inputLabel}>Contribution amount</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter contribution amount"
-                  value={contributionAmount}
-                  onChangeText={setContributionAmount}
-                  keyboardType="number-pad"
-                />
-              </View>
+              <TextInput
+                style={[styles.inputContainer, styles.input]}
+                placeholder="Enter contribution amount"
+                value={contributionAmount}
+                onChangeText={setContributionAmount}
+                keyboardType="number-pad"
+                placeholderTextColor="#999"
+              />
             </View>
 
              {/* Selection Type */}
@@ -445,5 +440,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '500',
+  },
+  disabledInput: {
+    backgroundColor: '#F8F8F8',
+    color: '#999',
   },
 });

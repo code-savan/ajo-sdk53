@@ -47,6 +47,8 @@ export default function LoginScreen() {
   const [storedBiometricEnabled, setStoredBiometricEnabled] = useState(false);
   const passwordInputRef = useRef<TextInput>(null);
   const loginInProgressRef = useRef(false); // Prevent double-clicks
+  const [isSwitchingAccounts, setIsSwitchingAccounts] = useState(false);
+  const [hasPreviouslyLoggedIn, setHasPreviouslyLoggedIn] = useState(false);
 
   // Remove eager navigation; let App.tsx handle gating
   useEffect(() => {
@@ -85,15 +87,21 @@ export default function LoginScreen() {
   const checkStoredPassword = async () => {
     try {
       const storedPassword = await SecureStore.getItemAsync('user_password');
-      setHasStoredPassword(!!storedPassword);
-
-      // Also check if biometrics was enabled for this account
+      const storedEmail = await SecureStore.getItemAsync('user_email');
+      const storedPin = await SecureStore.getItemAsync('user_pin_hash');
       const biometricEnabledStored = await SecureStore.getItemAsync('biometric_enabled');
+
+      setHasStoredPassword(!!storedPassword);
       setStoredBiometricEnabled(biometricEnabledStored === 'true');
+
+      // Check if user has previously logged in (has any stored credentials)
+      const hasAnyStoredCredentials = !!(storedPassword || storedEmail || storedPin || biometricEnabledStored);
+      setHasPreviouslyLoggedIn(hasAnyStoredCredentials);
     } catch (error) {
       console.error('Error checking stored password/biometric:', error);
       setHasStoredPassword(false);
       setStoredBiometricEnabled(false);
+      setHasPreviouslyLoggedIn(false);
     }
   };
 
@@ -217,6 +225,58 @@ export default function LoginScreen() {
   const handlePasswordChange = (value: string) => {
     console.log('Password input changed:', value.length, 'chars');
     setPassword(value);
+  };
+
+  const handleSwitchAccounts = async () => {
+    Alert.alert(
+      'Sign in as Different User',
+      'This will clear your stored credentials and require password login. Continue?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+
+              // Clear all AsyncStorage caches
+              const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+              const allKeys = await AsyncStorage.getAllKeys();
+              await AsyncStorage.multiRemove(allKeys).catch(() => {});
+
+              // Clear all SecureStore credentials
+              await SecureStore.deleteItemAsync('user_email').catch(() => {});
+              await SecureStore.deleteItemAsync('user_password').catch(() => {});
+              await SecureStore.deleteItemAsync('user_pin_hash').catch(() => {});
+              await SecureStore.deleteItemAsync('biometric_enabled').catch(() => {});
+              await SecureStore.deleteItemAsync('pin_attempts').catch(() => {});
+              await SecureStore.deleteItemAsync('pin_blocked_until').catch(() => {});
+
+              // Reset form state
+              setEmail('');
+              setPin('');
+              setPassword('');
+              setShowPasswordLogin(true); // Force password login
+              setRequirePassword(true); // Require password
+              setIsSwitchingAccounts(true);
+              setHasStoredPassword(false);
+              setStoredBiometricEnabled(false);
+
+              Alert.alert('Success', 'Please sign in with your password');
+            } catch (error) {
+              console.error('Error switching accounts:', error);
+              Alert.alert('Error', 'Failed to clear credentials');
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleProceed = async () => {
@@ -692,11 +752,11 @@ export default function LoginScreen() {
                 PIN locked due to multiple failed attempts. Please use your password.
               </Text>
             )}
-            {!requirePassword && showPasswordLogin && (
+            {/* {!requirePassword && showPasswordLogin && (
               <Text style={styles.infoText}>
                 Enter your password to sign in.
               </Text>
-            )}
+            )} */}
             <View style={styles.pinInputContainer}>
               <TextInput
                 ref={passwordInputRef}
@@ -726,8 +786,8 @@ export default function LoginScreen() {
                 )}
               </TouchableOpacity>
             </View>
-            {/* Option to switch back to PIN if not locked */}
-            {!requirePassword && showPasswordLogin && (
+            {/* Option to switch back to PIN if not locked and not switching accounts */}
+            {!requirePassword && showPasswordLogin && !isSwitchingAccounts && (
               <TouchableOpacity
                 onPress={() => setShowPasswordLogin(false)}
                 style={styles.switchLoginMethod}
@@ -762,14 +822,16 @@ export default function LoginScreen() {
                 selectTextOnFocus={true}
               />
             </View>
-            {/* Option to use password instead (for cross-device login) */}
-            <TouchableOpacity
-              onPress={() => setShowPasswordLogin(true)}
-              style={styles.switchLoginMethod}
-              disabled={isLoading || authLoading}
-            >
-              <Text style={[styles.switchLoginMethodText, (isLoading || authLoading) && styles.textDisabled]}>Use password instead</Text>
-            </TouchableOpacity>
+            {/* Option to use password instead (for cross-device login) - not shown when switching accounts */}
+            {!isSwitchingAccounts && (
+              <TouchableOpacity
+                onPress={() => setShowPasswordLogin(true)}
+                style={styles.switchLoginMethod}
+                disabled={isLoading || authLoading}
+              >
+                <Text style={[styles.switchLoginMethodText, (isLoading || authLoading) && styles.textDisabled]}>Use password instead</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -835,7 +897,7 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         {/* Face ID Button - Only show if user has enabled biometrics in their account settings */}
-        {(biometricEnabled || storedBiometricEnabled) && (biometricType || localBiometricType) && !requirePassword && !showPasswordLogin && (
+        {(biometricEnabled || storedBiometricEnabled) && (biometricType || localBiometricType) && !requirePassword && !showPasswordLogin && !isSwitchingAccounts && (
           <View style={styles.faceIdSection}>
             <TouchableOpacity
               style={[styles.faceIdButton, (isLoading || authLoading) && styles.faceIdButtonDisabled]}
@@ -848,6 +910,16 @@ export default function LoginScreen() {
               <ScanFace size={20} color={(isLoading || authLoading) ? "#999" : "#000"} />
             </TouchableOpacity>
           </View>
+        )}
+
+        {/* Sign in as Different User - Only show if user has previously logged in */}
+        {!isSwitchingAccounts && hasPreviouslyLoggedIn && (
+          <TouchableOpacity
+            style={styles.switchAccountButton}
+            onPress={handleSwitchAccounts}
+          >
+            <Text style={styles.switchAccountText}>Sign in as different user</Text>
+          </TouchableOpacity>
         )}
 
         {/* Create Account Link */}
@@ -1129,6 +1201,22 @@ const styles = StyleSheet.create({
   textDisabled: {
     color: '#999',
     opacity: 0.5,
+  },
+  switchAccountButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+    // borderWidth: 1,
+    // borderColor: '#E5E5E5',
+    // backgroundColor: '#F9F9F9',
+    alignItems: 'center',
+  },
+  switchAccountText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
   },
 
 });

@@ -29,11 +29,53 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ navigation }) => {
   const [showPinModal, setShowPinModal] = React.useState(false);
   const [pinForBiometric, setPinForBiometric] = React.useState('');
   const [localBiometricEnabled, setLocalBiometricEnabled] = React.useState(biometricEnabled);
+  const [localBiometricType, setLocalBiometricType] = React.useState<string | null>(biometricType);
+  const [biometricAvailable, setBiometricAvailable] = React.useState(false);
+
+  // Check biometric availability on mount
+  React.useEffect(() => {
+    checkBiometricAvailability();
+  }, []);
+
+  const checkBiometricAvailability = async () => {
+    try {
+      const LocalAuth = await import('expo-local-authentication');
+      const hasHardware = await LocalAuth.hasHardwareAsync();
+      const isEnrolled = await LocalAuth.isEnrolledAsync();
+      const supportedTypes = await LocalAuth.supportedAuthenticationTypesAsync();
+
+      if (hasHardware && isEnrolled && supportedTypes.length > 0) {
+        setBiometricAvailable(true);
+
+        // Determine biometric type
+        const AuthType: any = (LocalAuth as any).AuthenticationType || {};
+        if (supportedTypes.includes(AuthType.FACIAL_RECOGNITION)) {
+          setLocalBiometricType('face_id');
+        } else if (supportedTypes.includes(AuthType.FINGERPRINT)) {
+          setLocalBiometricType('fingerprint');
+        } else {
+          setLocalBiometricType('biometric');
+        }
+      } else {
+        setBiometricAvailable(false);
+      }
+    } catch (error) {
+      console.error('Error checking biometric availability:', error);
+      setBiometricAvailable(false);
+    }
+  };
 
   // Update local state when context state changes
   React.useEffect(() => {
     setLocalBiometricEnabled(biometricEnabled);
   }, [biometricEnabled]);
+
+  // Update local biometric type from context
+  React.useEffect(() => {
+    if (biometricType) {
+      setLocalBiometricType(biometricType);
+    }
+  }, [biometricType]);
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -252,7 +294,7 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ navigation }) => {
 
       Alert.alert(
         'Success',
-        `${biometricType === 'face_id' ? 'Face ID' : biometricType === 'fingerprint' ? 'Fingerprint' : 'Biometric'} authentication has been enabled.`
+        `${localBiometricType === 'face_id' ? 'Face ID' : localBiometricType === 'fingerprint' ? 'Fingerprint' : 'Biometric'} authentication has been enabled.`
       );
 
     } catch (error: any) {
@@ -307,12 +349,12 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ navigation }) => {
         <View style={styles.optionContent}>
           <Text style={styles.optionTitle}>Enable biometrics</Text>
           <Text style={styles.optionDescription}>
-            {biometricType ?
-              `Enable/disable ${biometricType === 'face_id' ? 'Face ID' : biometricType === 'fingerprint' ? 'Touch ID' : 'biometric'} authentication` :
+            {biometricAvailable ?
+              `Enable/disable ${localBiometricType === 'face_id' ? 'Face ID' : localBiometricType === 'fingerprint' ? 'Touch ID' : 'biometric'} authentication` :
               'Biometric authentication not available on this device'}
           </Text>
         </View>
-        {biometricType ? (
+        {biometricAvailable ? (
           isProcessing ? (
             <ActivityIndicator size="small" color="#000" />
           ) : (
