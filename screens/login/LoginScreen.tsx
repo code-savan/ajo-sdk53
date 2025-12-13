@@ -97,7 +97,10 @@ export default function LoginScreen() {
     }
   };
 
-  // Auto-attempt biometric authentication if enabled in user's account (only once)
+  // Auto-attempt biometric authentication is DISABLED
+  // User must explicitly click the Face ID button to trigger biometric login
+  // This prevents automatic re-login after logout
+  /*
   useEffect(() => {
     const checkAndAttemptBiometric = async () => {
       // Only auto-attempt if biometric is enabled in user's account settings
@@ -112,6 +115,7 @@ export default function LoginScreen() {
 
     checkAndAttemptBiometric();
   }, [biometricEnabled, biometricType, localBiometricType, attemptedBiometric, user, requirePassword]);
+  */
 
   // Auto-focus password input when it becomes visible
   useEffect(() => {

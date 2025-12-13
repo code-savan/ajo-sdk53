@@ -4,7 +4,7 @@
     "slug": "ajo-mobile-app",
     "version": "1.0.4",
     "orientation": "portrait",
-    "icon": "./assets/appicon.png",
+    "icon": "./assets/appicon1.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "scheme": "ajopay",
@@ -60,7 +60,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/appicon.png",
+          "icon": "./assets/appicon1.png",
           "color": "#3358FF",
           "sounds": [],
           "mode": "production"
