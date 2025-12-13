@@ -585,8 +585,9 @@ export default function LoginScreen() {
 
       } else {
         console.log('Biometric authentication cancelled or failed:', result.error);
-        if (result.error === 'user_cancel') {
-          // User cancelled, do nothing
+        // Ignore non-critical errors (user_cancel, system_cancel, app_cancel)
+        if (result.error === 'user_cancel' || result.error === 'system_cancel' || result.error === 'app_cancel') {
+          // User or system cancelled, do nothing
         } else if (result.error) {
           Alert.alert('Authentication Failed', `Biometric authentication failed: ${result.error}`);
         }
@@ -666,14 +667,14 @@ export default function LoginScreen() {
           <Text style={styles.inputLabel}>Email Address</Text>
           <View style={styles.emailInputContainer}>
             <TextInput
-              style={styles.emailInput}
+              style={[styles.emailInput, (isLoading || authLoading) && styles.inputDisabled]}
               value={email}
               onChangeText={setEmail}
               placeholder="Enter your email address"
               placeholderTextColor="#999"
               keyboardType="email-address"
               autoCapitalize="none"
-              editable={!isLoading}
+              editable={!isLoading && !authLoading}
             />
           </View>
         </View>
@@ -726,8 +727,9 @@ export default function LoginScreen() {
               <TouchableOpacity
                 onPress={() => setShowPasswordLogin(false)}
                 style={styles.switchLoginMethod}
+                disabled={isLoading || authLoading}
               >
-                <Text style={styles.switchLoginMethodText}>Use PIN instead</Text>
+                <Text style={[styles.switchLoginMethodText, (isLoading || authLoading) && styles.textDisabled]}>Use PIN instead</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -742,15 +744,15 @@ export default function LoginScreen() {
             )}
             <View style={styles.pinInputContainer}>
               <TextInput
-                style={styles.pinInput}
-                value={pin}
+                style={[styles.pinInput, (isLoading || authLoading) && styles.inputDisabled]}
+                value={isLoading || authLoading ? '••••' : pin}
                 onChangeText={handlePinChange}
                 secureTextEntry={true}
                 placeholder="Enter 4-digit PIN"
                 placeholderTextColor="#999"
                 keyboardType="number-pad"
                 maxLength={4}
-                editable={!isLoading}
+                editable={!isLoading && !authLoading}
                 returnKeyType="done"
                 onSubmitEditing={handleProceed}
                 selectTextOnFocus={true}
@@ -760,8 +762,9 @@ export default function LoginScreen() {
             <TouchableOpacity
               onPress={() => setShowPasswordLogin(true)}
               style={styles.switchLoginMethod}
+              disabled={isLoading || authLoading}
             >
-              <Text style={styles.switchLoginMethodText}>Use password instead</Text>
+              <Text style={[styles.switchLoginMethodText, (isLoading || authLoading) && styles.textDisabled]}>Use password instead</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1114,6 +1117,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '600',
+  },
+  inputDisabled: {
+    backgroundColor: '#F5F5F5',
+    color: '#999',
+  },
+  textDisabled: {
+    color: '#999',
+    opacity: 0.5,
   },
 
 });
