@@ -9,18 +9,18 @@
     "newArchEnabled": true,
     "scheme": "ajopay",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/appicon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#3358FF"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.codesavan.ajo",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "splash": {
-        "image": "./assets/splash.png",
+        "image": "./assets/appicon.png",
         "resizeMode": "contain",
-        "backgroundColor": "#3358FF"
+        "backgroundColor": "#FFFFFF"
       },
       "usesAppleSignIn": true,
       "infoPlist": {
@@ -37,9 +37,9 @@
         "backgroundColor": "#3358FF"
       },
       "splash": {
-        "image": "./assets/splash.png",
+        "image": "./assets/appicon.png",
         "resizeMode": "contain",
-        "backgroundColor": "#3358FF"
+        "backgroundColor": "#FFFFFF"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.codesavan.ajo"
