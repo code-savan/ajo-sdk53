@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -111,71 +111,86 @@ export default function WithdrawFundsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
-          <ArrowLeft width={24} height={24} color="#000000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Withdraw funds</Text>
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.titleSection}>
-          <Text style={styles.title}>Withdraw funds</Text>
-          <Text style={styles.subtitle}>
-            Easily transfer money from your wallet to your linked bank account.
-          </Text>
-          {loading ? <ActivityIndicator style={{ marginTop: 8 }} /> : null}
-          <Text style={{ marginTop: 8, color: '#6B7280' }}>
-            Available: ${formatCurrency(availableCents)}
-          </Text>
-          {error ? <Text style={{ marginTop: 8, color: '#ef4444' }}>{error}</Text> : null}
-        </View>
-
-        <View style={styles.inputSection}>
-          <Text style={styles.inputLabel}>Enter amount</Text>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="$100"
-              keyboardType="decimal-pad"
-              defaultValue="$100"
-              onChangeText={(t)=>setAmount(t.startsWith('$')?t:`$${t}`)}
-            />
-          </View>
-        </View>
-
-        <View style={styles.inputSection}>
-          <Text style={styles.inputLabel}>Withdraw to</Text>
-          {accountsLoading ? (
-            <ActivityIndicator />
-          ) : accounts.length === 0 ? (
-            <View style={styles.inputContainer}>
-              <Text style={[styles.paymentMethod, { marginBottom: 8 }]}>No linked accounts</Text>
-              <TouchableOpacity onPress={()=>navigation.navigate('WalletAndPayment' as never)} style={styles.linkCta}>
-                <Text style={styles.linkCtaText}>Manage linked account</Text>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.innerContainer}>
+            <View style={styles.header}>
+              <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
+                <ArrowLeft width={24} height={24} color="#000000" />
               </TouchableOpacity>
+              <Text style={styles.headerTitle}>Withdraw funds</Text>
             </View>
-          ) : (
-            <View style={{ gap: 10 }}>
-              {accounts.map((a) => (
-                <TouchableOpacity key={a.id} style={styles.accountRow} onPress={()=>setSelectedAccountId(a.id)}>
-                  <View style={[styles.radio, selectedAccountId===a.id && styles.radioActive]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.accountTitle}>{a.bank_name}</Text>
-                    <Text style={styles.accountSub}>{a.account_holder_name} • ••••{a.account_number_last4}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity style={[styles.proceedButton, submitting && { opacity: 0.6 }]} onPress={handleProceed} disabled={submitting || loading}>
-            <Text style={styles.proceedButtonText}>{submitting ? 'Processing...' : 'Proceed'}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+            <ScrollView
+              style={styles.content}
+              contentContainerStyle={styles.contentContainer}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.titleSection}>
+                <Text style={styles.title}>Withdraw funds</Text>
+                <Text style={styles.subtitle}>
+                  Easily transfer money from your wallet to your linked bank account.
+                </Text>
+                {loading ? <ActivityIndicator style={{ marginTop: 8 }} /> : null}
+                <Text style={{ marginTop: 8, color: '#6B7280' }}>
+                  Available: ${formatCurrency(availableCents)}
+                </Text>
+                {error ? <Text style={{ marginTop: 8, color: '#ef4444' }}>{error}</Text> : null}
+              </View>
+
+              <View style={styles.inputSection}>
+                <Text style={styles.inputLabel}>Enter amount</Text>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="$100"
+                    keyboardType="decimal-pad"
+                    defaultValue="$100"
+                    onChangeText={(t)=>setAmount(t.startsWith('$')?t:`$${t}`)}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputSection}>
+                <Text style={styles.inputLabel}>Withdraw to</Text>
+                {accountsLoading ? (
+                  <ActivityIndicator />
+                ) : accounts.length === 0 ? (
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.paymentMethod, { marginBottom: 8 }]}>No linked accounts</Text>
+                    <TouchableOpacity onPress={()=>navigation.navigate('WalletAndPayment' as never)} style={styles.linkCta}>
+                      <Text style={styles.linkCtaText}>Manage linked account</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={{ gap: 10 }}>
+                    {accounts.map((a) => (
+                      <TouchableOpacity key={a.id} style={styles.accountRow} onPress={()=>setSelectedAccountId(a.id)}>
+                        <View style={[styles.radio, selectedAccountId===a.id && styles.radioActive]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.accountTitle}>{a.bank_name}</Text>
+                          <Text style={styles.accountSub}>{a.account_holder_name} • ••••{a.account_number_last4}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity style={[styles.proceedButton, submitting && { opacity: 0.6 }]} onPress={handleProceed} disabled={submitting || loading}>
+                  <Text style={styles.proceedButtonText}>{submitting ? 'Processing...' : 'Proceed'}</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -184,6 +199,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  innerContainer: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -203,8 +224,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     paddingHorizontal: 20,
     paddingTop: 20,
+    paddingBottom: 40,
   },
   titleSection: {
     marginBottom: 40,
@@ -258,9 +282,7 @@ const styles = StyleSheet.create({
   accountTitle: { fontSize: 14, fontWeight: '500', color: '#1C1C1C' },
   accountSub: { fontSize: 12, color: '#6B7280' },
   buttonContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    marginBottom: 40,
+    marginTop: 40,
   },
   proceedButton: {
     backgroundColor: '#000000',

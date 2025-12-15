@@ -79,7 +79,7 @@ const ChangePinScreen: React.FC<ChangePinScreenProps> = ({ navigation }) => {
     }
 
     // Validate PIN is numeric
-    if (!/^\d{4}$/.test(newPin)) {
+    if (!/^\d{4}$/.test(oldPin) || !/^\d{4}$/.test(newPin)) {
       Alert.alert('Error', 'PIN must contain only numbers');
       return;
     }
@@ -88,7 +88,14 @@ const ChangePinScreen: React.FC<ChangePinScreenProps> = ({ navigation }) => {
     Keyboard.dismiss();
 
     try {
+      console.log('ChangePinScreen: Starting PIN update...');
       await updatePin(oldPin, newPin);
+      console.log('ChangePinScreen: PIN update successful');
+
+      // Clear inputs
+      setOldPin('');
+      setNewPin('');
+      setRepeatNewPin('');
 
       Alert.alert(
         'Success',
@@ -101,11 +108,21 @@ const ChangePinScreen: React.FC<ChangePinScreenProps> = ({ navigation }) => {
         ]
       );
     } catch (error: any) {
-      console.error('PIN change error:', error);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to change PIN. Please check your current PIN and try again.'
-      );
+      console.error('ChangePinScreen: PIN change error:', error);
+
+      let errorMessage = 'Failed to change PIN. Please try again.';
+
+      if (error.message?.includes('Current PIN is incorrect')) {
+        errorMessage = 'The current PIN you entered is incorrect. Please try again.';
+      } else if (error.message?.includes('blocked')) {
+        errorMessage = 'PIN entry is temporarily blocked. Please try again later or use your password.';
+      } else if (error.message?.includes('No user session')) {
+        errorMessage = 'Your session has expired. Please log in again.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsLoading(false);
     }

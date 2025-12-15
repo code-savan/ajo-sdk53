@@ -142,28 +142,21 @@ export default function LoginScreen() {
 
       if (storedEmail) {
         setEmail(storedEmail);
-
-        // Check failed attempts from database
-        const { data, error } = await supabase
-          .from('users')
-          .select('failed_pin_attempts')
-          .eq('email', storedEmail)
-          .single();
-
-        console.log('checkFailedAttempts: database result =', { data, error });
-
-        if (data && data.failed_pin_attempts >= 3) {
-          console.log('checkFailedAttempts: Setting requirePassword to true, failed attempts =', data.failed_pin_attempts);
-          setFailedAttempts(data.failed_pin_attempts);
-          setRequirePassword(true);
-        } else {
-          console.log('checkFailedAttempts: Failed attempts below threshold or no data, failed attempts =', data?.failed_pin_attempts || 0);
-          setFailedAttempts(data?.failed_pin_attempts || 0);
-          setRequirePassword(false);
-        }
+        // User has stored email - they can use PIN by default
+        // We DON'T auto-lock based on database data to avoid stale locks
+        setShowPasswordLogin(false);
+        setRequirePassword(false);
+        setFailedAttempts(0);
+      } else {
+        // First-time user or no stored email - show password login by default
+        console.log('No stored email - showing password login for first-time user');
+        setShowPasswordLogin(true);
+        setRequirePassword(false);
       }
     } catch (error) {
       console.error('Error checking failed attempts:', error);
+      // On error, default to password login for safety
+      setShowPasswordLogin(true);
     }
   };
 
@@ -222,9 +215,8 @@ export default function LoginScreen() {
     }
   };
 
-  const handlePasswordChange = (value: string) => {
-    console.log('Password input changed:', value.length, 'chars');
-    setPassword(value);
+  const handlePasswordChange = (text: string) => {
+    setPassword(text);
   };
 
   const handleSwitchAccounts = async () => {
@@ -266,12 +258,17 @@ export default function LoginScreen() {
               setHasStoredPassword(false);
               setStoredBiometricEnabled(false);
 
-              Alert.alert('Success', 'Please sign in with your password');
+              // Reset loading state BEFORE showing alert
+              setIsLoading(false);
+
+              // Use setTimeout to ensure state updates complete before Alert
+              setTimeout(() => {
+                Alert.alert('Success', 'Please sign in with your password');
+              }, 100);
             } catch (error) {
               console.error('Error switching accounts:', error);
-              Alert.alert('Error', 'Failed to clear credentials');
-            } finally {
               setIsLoading(false);
+              Alert.alert('Error', 'Failed to clear credentials');
             }
           }
         }
@@ -280,14 +277,14 @@ export default function LoginScreen() {
   };
 
   const handleProceed = async () => {
-    // Prevent double-clicks
-    if (loginInProgressRef.current || isLoading || authLoading) {
+    // Prevent double-clicks - only check our local state, not authLoading from context
+    if (loginInProgressRef.current || isLoading) {
       console.log('Login already in progress, ignoring');
       return;
     }
 
     if (!email.trim()) {
-      Alert.alert('Missing Information', 'Please enter your email address');
+      Alert.alert('Missing Information', 'Please enter your email or phone number');
       return;
     }
 
@@ -296,13 +293,13 @@ export default function LoginScreen() {
         Alert.alert('Missing Information', 'Please enter your password');
         return;
       }
-      await handlePasswordLogin();
+      handlePasswordLogin();
     } else {
       if (pin.length !== 4) {
         Alert.alert('Invalid PIN', 'Please enter your 4-digit PIN');
         return;
       }
-      await handlePinLogin();
+      handlePinLogin();
     }
   };
 
@@ -508,9 +505,11 @@ export default function LoginScreen() {
     setIsLoading(true);
 
     try {
-      await signInWithEmail(email, password);
+      // Support both email and phone login
+      const identifier = email.trim().toLowerCase();
+      await signInWithEmail(identifier, password);
       await resetFailedAttempts();
-      await SecureStore.setItemAsync('user_email', email);
+      await SecureStore.setItemAsync('user_email', identifier);
       await SecureStore.setItemAsync('user_password', password);
 
       // Clear session timeout flag if set
@@ -533,7 +532,7 @@ export default function LoginScreen() {
       console.error('Password login error:', error);
       Alert.alert(
         'Login Error',
-        error.message || 'Invalid email or password. Please try again.'
+        error.message || 'Invalid email/phone or password. Please try again.'
       );
     } finally {
       setIsLoading(false);
@@ -726,19 +725,19 @@ export default function LoginScreen() {
           <Text style={styles.subtitle}>"Welcome back. Let's get you where you left off."</Text>
         </View>
 
-        {/* Email Input Section */}
+        {/* Email/Phone Input Section */}
         <View style={styles.inputSection}>
-          <Text style={styles.inputLabel}>Email Address</Text>
+          <Text style={styles.inputLabel}>Email or Phone</Text>
           <View style={styles.emailInputContainer}>
             <TextInput
-              style={[styles.emailInput, (isLoading || authLoading) && styles.inputDisabled]}
+              style={styles.emailInput}
               value={email}
-              onChangeText={setEmail}
-              placeholder="Enter your email address"
+              onChangeText={(text) => setEmail(text)}
+              placeholder="Enter your email or phone"
               placeholderTextColor="#999"
               keyboardType="email-address"
               autoCapitalize="none"
-              editable={!isLoading && !authLoading}
+              autoCorrect={false}
             />
           </View>
         </View>
@@ -747,42 +746,29 @@ export default function LoginScreen() {
           /* Password Input Section */
           <View style={styles.pinSection}>
             <Text style={styles.pinLabel}>Password</Text>
-            {requirePassword && (
-              <Text style={styles.warningText}>
-                PIN locked due to multiple failed attempts. Please use your password.
-              </Text>
-            )}
-            {/* {!requirePassword && showPasswordLogin && (
-              <Text style={styles.infoText}>
-                Enter your password to sign in.
-              </Text>
-            )} */}
-            <View style={styles.pinInputContainer}>
+            <View style={styles.emailInputContainer}>
               <TextInput
                 ref={passwordInputRef}
-                style={styles.pinInput}
+                style={styles.passwordTextInput}
                 value={password}
-                onChangeText={handlePasswordChange}
+                onChangeText={(text) => setPassword(text)}
                 secureTextEntry={!showPassword}
                 placeholder="Enter your password"
                 placeholderTextColor="#999"
-                editable={!isLoading && !authLoading}
-                returnKeyType="done"
-                onSubmitEditing={handleProceed}
                 autoCapitalize="none"
                 autoCorrect={false}
-                textContentType="password"
-                keyboardType="default"
-                selectTextOnFocus={true}
+                returnKeyType="done"
+                onSubmitEditing={handleProceed}
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeButton}
+                style={styles.eyeButtonInline}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 {showPassword ? (
-                  <Eye size={20} color="#999" />
+                  <Eye size={20} color="#666" />
                 ) : (
-                  <EyeOff size={20} color="#999" />
+                  <EyeOff size={20} color="#666" />
                 )}
               </TouchableOpacity>
             </View>
@@ -791,9 +777,8 @@ export default function LoginScreen() {
               <TouchableOpacity
                 onPress={() => setShowPasswordLogin(false)}
                 style={styles.switchLoginMethod}
-                disabled={isLoading || authLoading}
               >
-                <Text style={[styles.switchLoginMethodText, (isLoading || authLoading) && styles.textDisabled]}>Use PIN instead</Text>
+                <Text style={styles.switchLoginMethodText}>Use PIN instead</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -806,20 +791,18 @@ export default function LoginScreen() {
                 {3 - failedAttempts} attempts remaining
               </Text>
             )}
-            <View style={styles.pinInputContainer}>
+            <View style={styles.emailInputContainer}>
               <TextInput
-                style={[styles.pinInput, (isLoading || authLoading) && styles.inputDisabled]}
-                value={isLoading || authLoading ? '••••' : pin}
-                onChangeText={handlePinChange}
+                style={styles.emailInput}
+                value={pin}
+                onChangeText={(text) => handlePinChange(text)}
                 secureTextEntry={true}
                 placeholder="Enter 4-digit PIN"
                 placeholderTextColor="#999"
                 keyboardType="number-pad"
                 maxLength={4}
-                editable={!isLoading && !authLoading}
                 returnKeyType="done"
                 onSubmitEditing={handleProceed}
-                selectTextOnFocus={true}
               />
             </View>
             {/* Option to use password instead (for cross-device login) - not shown when switching accounts */}
@@ -827,9 +810,8 @@ export default function LoginScreen() {
               <TouchableOpacity
                 onPress={() => setShowPasswordLogin(true)}
                 style={styles.switchLoginMethod}
-                disabled={isLoading || authLoading}
               >
-                <Text style={[styles.switchLoginMethodText, (isLoading || authLoading) && styles.textDisabled]}>Use password instead</Text>
+                <Text style={styles.switchLoginMethodText}>Use password instead</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -838,17 +820,22 @@ export default function LoginScreen() {
         {/* Proceed Button */}
         <TouchableOpacity
           style={[styles.proceedButton,
-            (isLoading || authLoading || !email.trim() ||
-             ((requirePassword || showPasswordLogin) && !password.trim()) ||
-             (!(requirePassword || showPasswordLogin) && pin.length !== 4)
+            (
+              isLoading ||
+              !email.trim() ||
+              ((requirePassword || showPasswordLogin) && !password.trim()) ||
+              (!(requirePassword || showPasswordLogin) && pin.length !== 4)
             ) && styles.proceedButtonDisabled
           ]}
           onPress={handleProceed}
-          disabled={isLoading || authLoading || !email.trim() ||
-                   ((requirePassword || showPasswordLogin) && !password.trim()) ||
-                   (!(requirePassword || showPasswordLogin) && pin.length !== 4)}
+          disabled={
+            isLoading ||
+            !email.trim() ||
+            ((requirePassword || showPasswordLogin) && !password.trim()) ||
+            (!(requirePassword || showPasswordLogin) && pin.length !== 4)
+          }
         >
-          {isLoading || authLoading ? (
+          {isLoading ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <Text style={styles.proceedButtonText}>Proceed</Text>
@@ -918,7 +905,7 @@ export default function LoginScreen() {
             style={styles.switchAccountButton}
             onPress={handleSwitchAccounts}
           >
-            <Text style={styles.switchAccountText}>Sign in as different user</Text>
+            <Text style={styles.switchAccountText}>Sign in as different user?</Text>
           </TouchableOpacity>
         )}
 
@@ -1011,14 +998,28 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   emailInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F5F5F5',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    minHeight: 52,
   },
   emailInput: {
+    flex: 1,
     fontSize: 14,
     color: '#000000',
+    paddingVertical: 16,
+  },
+  passwordTextInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#000000',
+    paddingVertical: 16,
+  },
+  eyeButtonInline: {
+    padding: 8,
+    marginLeft: 8,
   },
   pinSection: {
     marginBottom: 40,
@@ -1053,23 +1054,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '500',
-  },
-  pinInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  pinInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#000000',
-    fontWeight: '500',
-  },
-  eyeButton: {
-    padding: 4,
   },
   proceedButton: {
     backgroundColor: '#0D0D0D',
@@ -1212,6 +1196,10 @@ const styles = StyleSheet.create({
     // borderColor: '#E5E5E5',
     // backgroundColor: '#F9F9F9',
     alignItems: 'center',
+    position: 'absolute',
+    bottom: 15,
+    left: 0,
+    right: 0,
   },
   switchAccountText: {
     fontSize: 14,
