@@ -1197,7 +1197,7 @@ const styles = StyleSheet.create({
     // backgroundColor: '#F9F9F9',
     alignItems: 'center',
     position: 'absolute',
-    bottom: 15,
+    bottom: 35,
     left: 0,
     right: 0,
   },
