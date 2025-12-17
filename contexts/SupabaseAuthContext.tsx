@@ -782,15 +782,29 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Sign in with Apple is not available on this device');
       }
 
-      // Request Apple credential
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      });
+      // Request Apple credential with better error handling for iPad
+      let credential;
+      try {
+        credential = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+        });
+      } catch (appleError: any) {
+        // Handle Apple-specific errors on iPad
+        if (appleError.code === 'ERR_CANCELED' || appleError.code === 'ERR_REQUEST_CANCELED') {
+          console.log('Apple sign-in cancelled by user');
+          return;
+        }
+        if (appleError.code === '1001') {
+          // Unknown error on iPad - provide more context
+          throw new Error('Apple Sign-In is temporarily unavailable. Please try again or use email login.');
+        }
+        throw appleError;
+      }
 
-      if (!credential.identityToken) {
+      if (!credential || !credential.identityToken) {
         throw new Error('No identity token received from Apple');
       }
 
@@ -800,11 +814,18 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
         token: credential.identityToken,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase Apple auth error:', error);
+        throw error;
+      }
+
+      if (!data?.user) {
+        throw new Error('Authentication succeeded but no user data returned');
+      }
 
       // If we got the user's name from Apple (only provided on first sign-in),
       // save it to the user's profile
-      if (data?.user && credential.fullName) {
+      if (credential.fullName) {
         const fullName = [credential.fullName.givenName, credential.fullName.familyName]
           .filter(Boolean)
           .join(' ');
@@ -833,6 +854,9 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('Apple sign-in cancelled by user');
         return;
       }
+
+      // Log error for debugging
+      console.error('Apple sign-in error:', err);
       setError(err as AuthError);
       throw err;
     } finally {

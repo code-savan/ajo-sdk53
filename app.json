@@ -15,8 +15,9 @@
     },
     "ios": {
       "supportsTablet": false,
+      "requireFullScreen": true,
       "bundleIdentifier": "com.codesavan.ajo",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "splash": {
         "image": "./assets/appicon.png",
         "resizeMode": "contain",
@@ -26,9 +27,14 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication and to protect your account.",
-        "NSCameraUsageDescription": "This app uses the camera to let you take and upload profile or document photos.",
-        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library so you can select existing photos.",
-        "UIBackgroundModes": ["remote-notification"]
+        "NSCameraUsageDescription": "AjoPay uses the camera to let you take a profile picture for your account or capture photos for identity verification. For example, you can take a selfie to set as your profile image.",
+        "NSPhotoLibraryUsageDescription": "AjoPay needs access to your photo library to let you choose a profile picture for your account or upload photos when verifying your identity. For example, you can select a photo from your gallery to set as your profile image in Settings > Account Info.",
+        "UIBackgroundModes": ["remote-notification"],
+        "UIRequiresFullScreen": true,
+        "UISupportedInterfaceOrientations": [
+          "UIInterfaceOrientationPortrait"
+        ],
+        "UISupportedInterfaceOrientations~ipad": []
       }
     },
     "android": {
